@@ -1,0 +1,134 @@
+name: Windows build and release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows-x64:
+    runs-on: windows-2022
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install CI tooling
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check aqtinstall==3.3.0 clang-format==22.1.8
+          $clangFormat = (Get-Command clang-format.exe).Source
+          "CLANG_FORMAT=$clangFormat" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Cache native dependencies
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}\workflow-dependencies
+          key: workflow-windows-x64-qt-5.15.2-opencv-4.10.0-ort-1.13.1-v1
+
+      - name: Install native dependencies
+        shell: pwsh
+        run: ./scripts/Install-CiDependencies.ps1 -Destination "${{ runner.temp }}\workflow-dependencies"
+
+      - name: Configure
+        shell: pwsh
+        run: cmake --preset windows-msvc
+
+      - name: Check formatting
+        shell: pwsh
+        run: cmake --build build/windows-v142 --config Release --target workflow_lint
+
+      - name: Build Release
+        shell: pwsh
+        run: cmake --build --preset windows-release
+
+      - name: Test Release
+        shell: pwsh
+        run: ctest --preset windows-release
+
+      - name: Audit Windows 7 imports
+        shell: pwsh
+        run: cmake --build build/windows-v142 --config Release --target workflow_win7_audit
+
+      - name: Install SDK
+        shell: pwsh
+        run: cmake --install build/windows-v142 --config Release --prefix stage
+
+      - name: Verify installed package consumer
+        shell: pwsh
+        run: |
+          cmake -S tests/package_consumer -B build/package-consumer `
+            -G "Visual Studio 17 2022" -A x64 -T v142 `
+            -Dworkflow_DIR="$pwd/stage/lib/cmake/workflow" `
+            -DCMAKE_PREFIX_PATH="$env:WORKFLOW_QT_ROOT;$env:WORKFLOW_OPENCV_DIR"
+          cmake --build build/package-consumer --config Release --parallel 2
+          ctest --test-dir build/package-consumer -C Release --output-on-failure
+
+      - name: Add Debug SDK libraries for tagged releases
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        run: |
+          cmake --build --preset windows-debug
+          cmake --install build/windows-v142 --config Debug --prefix stage
+
+      - name: Create SDK archive
+        id: package
+        shell: pwsh
+        run: |
+          $match = Select-String -Path CMakeLists.txt -Pattern 'project\(workflow VERSION ([0-9.]+)'
+          if (-not $match.Matches) { throw 'Project version was not found' }
+          $version = $match.Matches[0].Groups[1].Value
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$version") {
+            throw "Tag $env:GITHUB_REF_NAME does not match project version v$version"
+          }
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $archive = "$pwd/dist/workflow-$version-windows-x64-win7sp1.zip"
+          Compress-Archive -Path "$pwd/stage/*" -DestinationPath $archive -CompressionLevel Optimal
+          $checksum = "$archive.sha256"
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash.ToLowerInvariant()
+          "$hash  $([System.IO.Path]::GetFileName($archive))" |
+            Out-File -FilePath $checksum -Encoding ascii
+          "archive=$archive" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "checksum=$checksum" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "name=workflow-$version-windows-x64-win7sp1" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Upload SDK artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.package.outputs.name }}
+          path: |
+            ${{ steps.package.outputs.archive }}
+            ${{ steps.package.outputs.checksum }}
+          if-no-files-found: error
+
+      - name: Publish GitHub release
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view $env:GITHUB_REF_NAME *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:GITHUB_REF_NAME `
+              "${{ steps.package.outputs.archive }}" `
+              "${{ steps.package.outputs.checksum }}" `
+              --clobber
+          } else {
+            gh release create $env:GITHUB_REF_NAME `
+              "${{ steps.package.outputs.archive }}" `
+              "${{ steps.package.outputs.checksum }}" `
+              --generate-notes --verify-tag
+          }

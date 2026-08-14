@@ -1,0 +1,57 @@
+# CMake build trees and generated files
+/build/
+/build-*/
+/out/
+/dist/
+/stage/
+/cmake-build-*/
+**/CMakeFiles/
+**/CMakeCache.txt
+**/cmake_install.cmake
+**/CTestTestfile.cmake
+**/Makefile
+**/Testing/
+compile_commands.json
+install_manifest.txt
+
+# Visual Studio / MSVC
+/.vs/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.obj
+*.iobj
+*.ipdb
+*.pdb
+*.ilk
+*.idb
+*.tlog
+*.lastbuildstate
+*.exp
+*.lib
+*.dll
+*.exe
+
+# Qt generated output
+*_autogen/
+moc_*.cpp
+qrc_*.cpp
+ui_*.h
+
+# Editors and operating system files
+/.idea/
+/.vscode/
+*.user
+*.suo
+*.swp
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini
+CMakeUserPresets.json
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp

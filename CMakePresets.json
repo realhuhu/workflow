@@ -1,0 +1,65 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 24,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "windows-msvc",
+      "displayName": "Windows x64 (MSVC v142, Windows 7 SP1 target)",
+      "generator": "Visual Studio 17 2022",
+      "binaryDir": "${sourceDir}/build/windows-v142",
+      "architecture": "x64",
+      "toolset": "v142",
+      "cacheVariables": {
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/stage",
+        "WORKFLOW_BUILD_EXAMPLES": "ON",
+        "WORKFLOW_BUILD_TESTS": "ON",
+        "WORKFLOW_INSTALL": "ON",
+        "WORKFLOW_QT_ROOT": "$env{WORKFLOW_QT_ROOT}",
+        "WORKFLOW_OPENCV_DIR": "$env{WORKFLOW_OPENCV_DIR}",
+        "WORKFLOW_OPENCV_BIN_DIR": "$env{WORKFLOW_OPENCV_BIN_DIR}",
+        "WORKFLOW_ONNXRUNTIME_ROOT": "$env{WORKFLOW_ONNXRUNTIME_ROOT}",
+        "WORKFLOW_CLANG_FORMAT_EXECUTABLE": "$env{CLANG_FORMAT}"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "windows-release",
+      "configurePreset": "windows-msvc",
+      "configuration": "Release",
+      "jobs": 2
+    },
+    {
+      "name": "windows-debug",
+      "configurePreset": "windows-msvc",
+      "configuration": "Debug",
+      "jobs": 2
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "windows-release",
+      "configurePreset": "windows-msvc",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ],
+  "packagePresets": [
+    {
+      "name": "windows-release",
+      "configurePreset": "windows-msvc",
+      "configurations": [
+        "Release"
+      ],
+      "generators": [
+        "ZIP"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+function(workflow_enable_windows7 target)
+    if (NOT TARGET ${target})
+        message(FATAL_ERROR "workflow_enable_windows7 target does not exist: ${target}")
+    endif()
+    if (MSVC)
+        get_target_property(_workflow_win32_executable ${target} WIN32_EXECUTABLE)
+        if (_workflow_win32_executable)
+            set(_workflow_subsystem WINDOWS)
+        else()
+            set(_workflow_subsystem CONSOLE)
+        endif()
+        target_link_options(${target} PRIVATE
+                "/SUBSYSTEM:${_workflow_subsystem},6.01"
+                "/MANIFESTINPUT:${WORKFLOW_WINDOWS_MANIFEST}")
+    endif()
+endfunction()
+
+function(workflow_stage_runtime target)
+    if (NOT TARGET ${target})
+        message(FATAL_ERROR "workflow_stage_runtime target does not exist: ${target}")
+    endif()
+
+    set(_runtime_dir "$<TARGET_FILE_DIR:${target}>")
+    add_custom_command(TARGET ${target} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${WORKFLOW_RUNTIME_DIRECTORY}/onnxruntime.dll"
+                    "${_runtime_dir}"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "$<TARGET_FILE:Qt5::Core>"
+                    "${_runtime_dir}"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${WORKFLOW_RUNTIME_DIRECTORY}/api-ms-win-core-libraryloader-l1-2-0.dll"
+                    "${_runtime_dir}"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${WORKFLOW_RUNTIME_DIRECTORY}/api-ms-win-core-processtopology-obsolete-l1-1-0.dll"
+                    "${_runtime_dir}"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${WORKFLOW_RUNTIME_DIRECTORY}/api-ms-win-eventing-provider-l1-1-0.dll"
+                    "${_runtime_dir}"
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                    "${WORKFLOW_MODELS_DIRECTORY}"
+                    "${_runtime_dir}/models"
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                    "${WORKFLOW_LICENSES_DIRECTORY}"
+                    "${_runtime_dir}/licenses"
+            VERBATIM)
+
+    if (TARGET opencv_world)
+        set(_workflow_opencv_targets opencv_world)
+    else()
+        set(_workflow_opencv_targets opencv_core opencv_imgproc opencv_imgcodecs)
+    endif()
+    foreach (_opencv_target IN LISTS _workflow_opencv_targets)
+        if (NOT TARGET ${_opencv_target})
+            message(FATAL_ERROR
+                    "The OpenCV package does not expose target ${_opencv_target}")
+        endif()
+        add_custom_command(TARGET ${target} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        "$<TARGET_FILE:${_opencv_target}>"
+                        "${_runtime_dir}"
+                VERBATIM)
+    endforeach()
+endfunction()
