@@ -1,4 +1,4 @@
-# Workflow 浏览器自动化校准台
+# Workflow 可视化测试程序
 
 这是一个完全离线的 Qt WebEngine 可视化测试应用。左侧是固定为 `1000 × 800` 的网页客户区，右侧是
 20 个测试用例、运行控制和框架日志。点击“运行当前用例”后，应用会在工作线程中创建真实的
@@ -6,27 +6,27 @@
 
 ## 构建和运行
 
-浏览器测试台在项目作为顶层工程时默认启用，也可以显式指定：
+测试程序在项目作为顶层工程时默认启用，也可以显式指定：
 
 ```powershell
-cmake --preset windows-msvc -DWORKFLOW_BUILD_BROWSER_HARNESS=ON
-cmake --build build/windows-v142 --config Release --target workflow_browser_harness
-& "build/windows-v142/tests/browser/Release/workflow-browser-harness.exe"
+cmake --preset windows-msvc -DWORKFLOW_BUILD_TEST_APP=ON
+cmake --build build/project --config Release --target workflow_test
+& "build/project/test/app/Release/workflow-test.exe"
 ```
 
 构建后会自动：
 
-- 把 `web/` 复制到可执行文件旁的 `browser-test/`；
+- 把 `page/` 复制到可执行文件旁的 `test-page/`；
 - 使用 `workflow_stage_runtime()` 部署 OCR 模型、OpenCV、ONNX Runtime 和许可证；
 - 使用 `windeployqt` 部署 Qt WebEngine 进程、资源和 DLL；
 - 首次启动时生成四张无抗锯齿的 48 × 48 PNG 模板到
-  `browser-test/游戏图片/fixtures/`，网页和 OpenCV 使用同一份文件。
+  `test-page/游戏图片/fixtures/`，网页和 OpenCV 使用同一份文件。
 
-GitHub Release 提供两个 Browser UI 运行包，解压后均可直接启动 `workflow-browser-harness.exe`：
+GitHub Release 提供两个测试程序运行包，解压后均可直接启动 `workflow-test.exe`：
 
-- `workflow-browser-ui-<version>-windows-x64-win7-compatible.zip`：Windows 7 SP1 兼容版，包含 MSVC
+- `workflow-test-<version>-windows-x64-win7-compatible.zip`：Windows 7 SP1 兼容版，包含 MSVC
   v142 CRT、应用本地 UCRT 和 API Set 转发 DLL，不要求另行安装 Visual C++ Redistributable；
-- `workflow-browser-ui-<version>-windows-x64-slim.zip`：Windows 10+ 精简版，只携带应用、Qt、OpenCV、
+- `workflow-test-<version>-windows-x64-slim.zip`：Windows 10+ 精简版，只携带应用、Qt、OpenCV、
   ONNX Runtime、OCR 模型与网页资源，要求系统已安装 Microsoft Visual C++ 2015–2022 x64 运行库。
 
 Windows 7 SP1 仍建议安装完整系统更新。Qt 采用动态链接，Qt LGPL/GPL 许可证全文位于 `licenses/`。
@@ -78,5 +78,5 @@ window.workflowFixture.reset();       // 清理计时器并恢复初始状态
 window.workflowFixture.state();       // 当前可视化状态
 ```
 
-CTest 中的 `workflow.browser-fixtures` 会校验页面数量、文件名、`data-case`、catalog 条目和对应 renderer，
+CTest 中的 `workflow.pages` 会校验页面数量、文件名、`data-case`、catalog 条目和对应 renderer，
 避免新增或重命名页面后留下不完整的测试入口。

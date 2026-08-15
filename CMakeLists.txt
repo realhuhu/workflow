@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(workflow VERSION 0.1.2 LANGUAGES CXX)
+project(workflow VERSION 0.1.3 LANGUAGES CXX)
 
 if (NOT WIN32)
     message(FATAL_ERROR "workflow currently supports Windows only")
@@ -25,8 +25,8 @@ endif()
 
 option(WORKFLOW_BUILD_EXAMPLES "Build workflow examples" ${_workflow_developer_default})
 option(WORKFLOW_BUILD_TESTS "Build workflow tests" ${_workflow_developer_default})
-option(WORKFLOW_BUILD_BROWSER_HARNESS
-        "Build the Qt WebEngine visual automation harness"
+option(WORKFLOW_BUILD_TEST_APP
+        "Build the Qt WebEngine visual test application"
         ${_workflow_developer_default})
 option(WORKFLOW_INSTALL "Generate install and CMake package rules" ${PROJECT_IS_TOP_LEVEL})
 set(WORKFLOW_CLANG_FORMAT_EXECUTABLE "$ENV{CLANG_FORMAT}" CACHE FILEPATH
@@ -98,7 +98,7 @@ if (NOT _workflow_ort_api_line STREQUAL "#define ORT_API_VERSION 13")
             "Windows 7 packages require ONNX Runtime 1.13.x (ORT API 13); found: ${_workflow_ort_api_line}")
 endif()
 
-set(WORKFLOW_MODELS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/data/rapidocr/models" CACHE PATH
+set(WORKFLOW_MODELS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resource/model" CACHE PATH
         "Directory containing det.onnx, cls.onnx, rec.onnx, and keys.txt")
 foreach (_model det.onnx cls.onnx rec.onnx keys.txt)
     if (NOT EXISTS "${WORKFLOW_MODELS_DIR}/${_model}")
@@ -316,10 +316,10 @@ function(workflow_stage_runtime target)
                     "${_workflow_source_dir}/src/third_party/rapidocr/LICENSE"
                     "${_runtime_dir}/licenses/Apache-2.0.txt"
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "${_workflow_source_dir}/licenses/BOOST-1.0.txt"
+                    "${_workflow_source_dir}/resource/license/BOOST-1.0.txt"
                     "${_runtime_dir}/licenses/Boost-1.0.txt"
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "${_workflow_source_dir}/licenses/Qt-LGPL-GPL-3.0.txt"
+                    "${_workflow_source_dir}/resource/license/Qt-LGPL-GPL-3.0.txt"
                     "${_runtime_dir}/licenses/Qt-LGPL-GPL-3.0.txt"
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                     "${WORKFLOW_ONNXRUNTIME_ROOT}/LICENSE"
@@ -346,10 +346,10 @@ function(workflow_stage_runtime target)
 endfunction()
 
 if (WORKFLOW_BUILD_EXAMPLES)
-    add_executable(mixed_workflow_example examples/mixed_workflow.cpp)
-    target_link_libraries(mixed_workflow_example PRIVATE workflow::workflow)
-    workflow_enable_windows7(mixed_workflow_example)
-    workflow_stage_runtime(mixed_workflow_example)
+    add_executable(workflow_example example/mixed.cpp)
+    target_link_libraries(workflow_example PRIVATE workflow::workflow)
+    workflow_enable_windows7(workflow_example)
+    workflow_stage_runtime(workflow_example)
 
     if (PROJECT_IS_TOP_LEVEL)
         find_program(WORKFLOW_POWERSHELL_EXECUTABLE NAMES pwsh powershell REQUIRED)
@@ -364,8 +364,8 @@ if (WORKFLOW_BUILD_EXAMPLES)
                 COMMAND "${WORKFLOW_POWERSHELL_EXECUTABLE}"
                         -NoProfile
                         -ExecutionPolicy Bypass
-                        -File "${CMAKE_CURRENT_SOURCE_DIR}/scripts/Test-Windows7Compatibility.ps1"
-                        "$<TARGET_FILE:mixed_workflow_example>"
+                        -File "${CMAKE_CURRENT_SOURCE_DIR}/tool/audit.ps1"
+                        "$<TARGET_FILE:workflow_example>"
                         "${WORKFLOW_ONNXRUNTIME_RUNTIME}"
                         "$<TARGET_FILE:Qt5::Core>"
                         "${_workflow_opencv_audit_dll}"
@@ -374,7 +374,7 @@ if (WORKFLOW_BUILD_EXAMPLES)
                         "$<TARGET_FILE:workflow_win7_eventing>"
                         "$<TARGET_FILE:workflow_win7_heap>"
                         "$<TARGET_FILE:workflow_win7_shlwapi>"
-                DEPENDS mixed_workflow_example
+                DEPENDS workflow_example
                 COMMENT "Auditing PE subsystem versions and post-Windows-7 imports"
                 VERBATIM)
     endif()
@@ -382,12 +382,12 @@ endif()
 
 if (WORKFLOW_BUILD_TESTS)
     enable_testing()
-    add_subdirectory(tests)
+    add_subdirectory(test)
 endif()
 
-if (WORKFLOW_BUILD_BROWSER_HARNESS)
+if (WORKFLOW_BUILD_TEST_APP)
     find_package(Qt5 5.15.2 EXACT REQUIRED COMPONENTS Gui Widgets WebEngineWidgets)
-    add_subdirectory(tests/browser)
+    add_subdirectory(test/app)
 endif()
 
 if (WORKFLOW_INSTALL)
@@ -421,10 +421,10 @@ if (WORKFLOW_INSTALL)
     install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/third_party/rapidocr/LICENSE"
             DESTINATION "${_workflow_package_data_dir}/licenses"
             RENAME Apache-2.0.txt)
-    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/licenses/BOOST-1.0.txt"
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/resource/license/BOOST-1.0.txt"
             DESTINATION "${_workflow_package_data_dir}/licenses"
             RENAME Boost-1.0.txt)
-    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/licenses/Qt-LGPL-GPL-3.0.txt"
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/resource/license/Qt-LGPL-GPL-3.0.txt"
             DESTINATION "${_workflow_package_data_dir}/licenses")
     install(FILES "${WORKFLOW_ONNXRUNTIME_ROOT}/LICENSE"
             DESTINATION "${_workflow_package_data_dir}/licenses"
@@ -471,7 +471,7 @@ if (WORKFLOW_INSTALL)
     set(CPACK_PACKAGE_VENDOR "workflow contributors")
     set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
     set(CPACK_PACKAGE_FILE_NAME
-            "workflow-${PROJECT_VERSION}-windows-x64-win7sp1")
+            "workflow-sdk-${PROJECT_VERSION}-windows-x64")
     set(CPACK_PACKAGE_CHECKSUM SHA256)
     include(CPack)
 endif()

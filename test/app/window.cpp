@@ -1,4 +1,4 @@
-#include "browser.h"
+#include "window.h"
 
 #include "cases.h"
 #include "core/environment.h"
@@ -40,8 +40,8 @@
 
 namespace {
 
-    constexpr int BrowserWidth = 1000;
-    constexpr int BrowserHeight = 800;
+    constexpr int PageWidth = 1000;
+    constexpr int PageHeight = 800;
     constexpr int PanelWidth = 390;
 
     struct RunOutcome {
@@ -49,10 +49,10 @@ namespace {
         QString message;
     };
 
-    const BrowserCase* findCase(
+    const TestCase* findCase(
         const int id
     ) {
-        for (const BrowserCase& definition : browserCases()) {
+        for (const TestCase& definition : testCases()) {
             if (definition.id == id) return &definition;
         }
         return nullptr;
@@ -125,7 +125,7 @@ namespace {
         renderer(painter);
         painter.end();
         if (!image.save(path, "PNG", 0)) {
-            throw std::runtime_error("无法生成浏览器测试模板: " + path.toStdString());
+            throw std::runtime_error("无法生成测试模板: " + path.toStdString());
         }
     }
 
@@ -153,15 +153,15 @@ void configureDeterministicBrowserProcess() {
     QCoreApplication::setAttribute(Qt::AA_Use96Dpi);
 }
 
-FixtureBrowserWindow::FixtureBrowserWindow(
+TestWindow::TestWindow(
     QWidget* parent
 ) : QMainWindow(parent), emitter(new Emitter(this)) {
     setWindowTitle(QStringLiteral("Workflow · 自动化校准台"));
     setObjectName(QStringLiteral("fixtureWindow"));
-    webRoot = QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("browser-test"));
+    webRoot = QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("test-page"));
 
     if (!QFileInfo::exists(QDir(webRoot).filePath(QStringLiteral("index.html")))) {
-        throw std::runtime_error("浏览器测试资源未部署到: " + webRoot.toStdString());
+        throw std::runtime_error("测试页面未部署到: " + webRoot.toStdString());
     }
     prepareFixtureImages();
     buildInterface();
@@ -183,15 +183,15 @@ FixtureBrowserWindow::FixtureBrowserWindow(
     }
 
     loadIndex();
-    setFixedSize(BrowserWidth + PanelWidth, BrowserHeight);
+    setFixedSize(PageWidth + PanelWidth, PageHeight);
 }
 
-FixtureBrowserWindow::~FixtureBrowserWindow() {
+TestWindow::~TestWindow() {
     stopFlag.store(true);
     if (worker && worker->isRunning()) worker->wait();
 }
 
-void FixtureBrowserWindow::buildInterface() {
+void TestWindow::buildInterface() {
     auto* central = new QWidget(this);
     central->setObjectName(QStringLiteral("central"));
     auto* rootLayout = new QHBoxLayout(central);
@@ -200,7 +200,7 @@ void FixtureBrowserWindow::buildInterface() {
 
     browser = new QWebEngineView(central);
     browser->setObjectName(QStringLiteral("fixtureBrowser"));
-    browser->setFixedSize(BrowserWidth, BrowserHeight);
+    browser->setFixedSize(PageWidth, PageHeight);
     browser->setContextMenuPolicy(Qt::NoContextMenu);
     browser->setZoomFactor(1.0);
     browser->setAttribute(Qt::WA_NativeWindow);
@@ -208,7 +208,7 @@ void FixtureBrowserWindow::buildInterface() {
 
     auto* panel = new QWidget(central);
     panel->setObjectName(QStringLiteral("controlPanel"));
-    panel->setFixedSize(PanelWidth, BrowserHeight);
+    panel->setFixedSize(PanelWidth, PageHeight);
     auto* panelLayout = new QVBoxLayout(panel);
     panelLayout->setContentsMargins(20, 18, 20, 18);
     panelLayout->setSpacing(10);
@@ -233,7 +233,7 @@ void FixtureBrowserWindow::buildInterface() {
     caseList = new QListWidget(panel);
     caseList->setObjectName(QStringLiteral("caseList"));
     caseList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    for (const BrowserCase& definition : browserCases()) {
+    for (const TestCase& definition : testCases()) {
         auto* item = new QListWidgetItem(
             QStringLiteral("%1  %2").arg(definition.id, 2, 10, QLatin1Char('0')).arg(definition.title),
             caseList
@@ -314,10 +314,10 @@ void FixtureBrowserWindow::buildInterface() {
         if (selected.isEmpty()) return;
         loadCase(selected.front()->data(Qt::UserRole).toInt());
     });
-    connect(runButton, &QPushButton::clicked, this, &FixtureBrowserWindow::runCurrentCase);
-    connect(resetButton, &QPushButton::clicked, this, &FixtureBrowserWindow::resetCurrentCase);
-    connect(stopButton, &QPushButton::clicked, this, &FixtureBrowserWindow::stopCurrentCase);
-    connect(indexButton, &QPushButton::clicked, this, &FixtureBrowserWindow::loadIndex);
+    connect(runButton, &QPushButton::clicked, this, &TestWindow::runCurrentCase);
+    connect(resetButton, &QPushButton::clicked, this, &TestWindow::resetCurrentCase);
+    connect(stopButton, &QPushButton::clicked, this, &TestWindow::stopCurrentCase);
+    connect(indexButton, &QPushButton::clicked, this, &TestWindow::loadIndex);
     connect(browser, &QWebEngineView::loadFinished, this, [this](const bool success) {
         pageReady = success;
         browser->setZoomFactor(1.0);
@@ -333,7 +333,7 @@ void FixtureBrowserWindow::buildInterface() {
     updateControls();
 }
 
-void FixtureBrowserWindow::configureBrowser() {
+void TestWindow::configureBrowser() {
     QWebEngineProfile* profile = browser->page()->profile();
     profile->setHttpCacheType(QWebEngineProfile::MemoryHttpCache);
     profile->setPersistentCookiesPolicy(QWebEngineProfile::NoPersistentCookies);
@@ -347,7 +347,7 @@ void FixtureBrowserWindow::configureBrowser() {
     settings->setAttribute(QWebEngineSettings::FullScreenSupportEnabled, false);
 }
 
-void FixtureBrowserWindow::prepareFixtureImages() const {
+void TestWindow::prepareFixtureImages() const {
     const QString fixtureDirectory = QDir(webRoot).filePath(QStringLiteral("游戏图片/fixtures"));
     if (!QDir().mkpath(fixtureDirectory)) {
         throw std::runtime_error("无法创建浏览器模板目录: " + fixtureDirectory.toStdString());
@@ -363,7 +363,7 @@ void FixtureBrowserWindow::prepareFixtureImages() const {
     saveMarker(QDir(fixtureDirectory).filePath(QStringLiteral("marker-c.png")), paintMarkerC);
 }
 
-void FixtureBrowserWindow::loadIndex() {
+void TestWindow::loadIndex() {
     if (worker) return;
     currentCaseId = 0;
     pageReady = false;
@@ -379,11 +379,11 @@ void FixtureBrowserWindow::loadIndex() {
     updateControls();
 }
 
-void FixtureBrowserWindow::loadCase(
+void TestWindow::loadCase(
     const int id
 ) {
     if (worker) return;
-    const BrowserCase* definition = findCase(id);
+    const TestCase* definition = findCase(id);
     if (!definition) return;
 
     currentCaseId = id;
@@ -395,9 +395,9 @@ void FixtureBrowserWindow::loadCase(
     updateControls();
 }
 
-void FixtureBrowserWindow::synchronizeCaseFromUrl() {
+void TestWindow::synchronizeCaseFromUrl() {
     const QString fileName = browser->url().fileName();
-    for (const BrowserCase& definition : browserCases()) {
+    for (const TestCase& definition : testCases()) {
         const QString expected =
             QStringLiteral("%1-%2.html").arg(definition.id, 2, 10, QLatin1Char('0')).arg(definition.slug);
         if (fileName != expected) continue;
@@ -410,8 +410,8 @@ void FixtureBrowserWindow::synchronizeCaseFromUrl() {
     if (fileName == QStringLiteral("index.html")) currentCaseId = 0;
 }
 
-void FixtureBrowserWindow::updateCaseDetails() {
-    const BrowserCase* definition = findCase(currentCaseId);
+void TestWindow::updateCaseDetails() {
+    const TestCase* definition = findCase(currentCaseId);
     if (!definition) return;
     caseTitle->setText(QStringLiteral("%1 · %2").arg(definition->id, 2, 10, QLatin1Char('0')).arg(definition->title));
     caseDetails->setText(
@@ -419,7 +419,7 @@ void FixtureBrowserWindow::updateCaseDetails() {
     );
 }
 
-void FixtureBrowserWindow::verifyPageEnvironment() {
+void TestWindow::verifyPageEnvironment() {
     browser->page()->runJavaScript(
         QStringLiteral("window.workflowFixture ? window.workflowFixture.environment() : null"),
         [this](const QVariant& value) {
@@ -445,14 +445,14 @@ void FixtureBrowserWindow::verifyPageEnvironment() {
     );
 }
 
-void FixtureBrowserWindow::resetCurrentCase() {
+void TestWindow::resetCurrentCase() {
     if (!pageReady || currentCaseId == 0 || worker) return;
     browser->page()->runJavaScript(QStringLiteral("window.workflowFixture.reset()"));
     setRunState(QStringLiteral("ready"), QStringLiteral("READY"));
     appendLog(QStringLiteral("用例 %1 已重置").arg(currentCaseId), QStringLiteral("blue"));
 }
 
-void FixtureBrowserWindow::runCurrentCase() {
+void TestWindow::runCurrentCase() {
     if (!pageReady || currentCaseId == 0 || worker) return;
     if (!ocrReady && currentCaseId >= 9) {
         QMessageBox::critical(this, QStringLiteral("OCR 不可用"), QStringLiteral("文字用例需要成功初始化 RapidOCR。"));
@@ -472,7 +472,7 @@ void FixtureBrowserWindow::runCurrentCase() {
     });
 }
 
-void FixtureBrowserWindow::startCaseWorker(
+void TestWindow::startCaseWorker(
     const int id
 ) {
     Env execution;
@@ -487,7 +487,7 @@ void FixtureBrowserWindow::startCaseWorker(
     QThread* thread = QThread::create([execution, id, outcome] {
         env = execution;
         try {
-            runBrowserCase(id);
+            runTestCase(id);
             outcome->success = !execution.stopFlag->load();
             outcome->message = outcome->success ? QStringLiteral("工作流执行完成") : QStringLiteral("用户已停止");
         } catch (const std::exception& exception) {
@@ -507,7 +507,7 @@ void FixtureBrowserWindow::startCaseWorker(
     updateControls();
 }
 
-void FixtureBrowserWindow::finishCaseWorker(
+void TestWindow::finishCaseWorker(
     const int id,
     const bool success,
     const QString& message
@@ -533,7 +533,7 @@ void FixtureBrowserWindow::finishCaseWorker(
     );
 }
 
-void FixtureBrowserWindow::stopCurrentCase() {
+void TestWindow::stopCurrentCase() {
     if (!worker) return;
     stopFlag.store(true);
     setRunState(QStringLiteral("running"), QStringLiteral("STOPPING"));
@@ -541,7 +541,7 @@ void FixtureBrowserWindow::stopCurrentCase() {
     updateControls();
 }
 
-void FixtureBrowserWindow::setRunState(
+void TestWindow::setRunState(
     const QString& state,
     const QString& text
 ) {
@@ -551,7 +551,7 @@ void FixtureBrowserWindow::setRunState(
     runStatus->style()->polish(runStatus);
 }
 
-void FixtureBrowserWindow::updateControls() {
+void TestWindow::updateControls() {
     const bool running = worker != nullptr;
     runButton->setEnabled(pageReady && currentCaseId > 0 && !running);
     resetButton->setEnabled(pageReady && currentCaseId > 0 && !running);
@@ -560,7 +560,7 @@ void FixtureBrowserWindow::updateControls() {
     caseList->setEnabled(!running);
 }
 
-void FixtureBrowserWindow::appendLog(
+void TestWindow::appendLog(
     const QString& text,
     const QString& color
 ) {
@@ -577,7 +577,7 @@ void FixtureBrowserWindow::appendLog(
             .arg(time, mappedColor(color), text));
 }
 
-void FixtureBrowserWindow::closeEvent(
+void TestWindow::closeEvent(
     QCloseEvent* event
 ) {
     stopFlag.store(true);

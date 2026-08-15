@@ -1,5 +1,5 @@
-#ifndef WORKFLOW_TESTS_BROWSER_BROWSER_H
-#define WORKFLOW_TESTS_BROWSER_BROWSER_H
+#ifndef WORKFLOW_TEST_APP_WINDOW_H
+#define WORKFLOW_TEST_APP_WINDOW_H
 
 #include <QMainWindow>
 
@@ -18,12 +18,12 @@ class QWebEngineView;
 
 void configureDeterministicBrowserProcess();
 
-class FixtureBrowserWindow final : public QMainWindow {
+class TestWindow final : public QMainWindow {
     Q_OBJECT
 
 public:
-    explicit FixtureBrowserWindow(QWidget* parent = nullptr);
-    ~FixtureBrowserWindow() override;
+    explicit TestWindow(QWidget* parent = nullptr);
+    ~TestWindow() override;
 
 protected:
     void closeEvent(QCloseEvent* event) override;
@@ -69,4 +69,4 @@ private:
     void appendLog(const QString& text, const QString& color = QStringLiteral("black"));
 };
 
-#endif // WORKFLOW_TESTS_BROWSER_BROWSER_H
+#endif // WORKFLOW_TEST_APP_WINDOW_H

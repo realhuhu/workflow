@@ -11,20 +11,20 @@ Windows 7 SP1 兼容目标。
 cmake --preset windows-msvc
 cmake --build --preset windows-release
 ctest --preset windows-release
-cmake --build build/windows-v142 --config Release --target workflow_lint
-cmake --build build/windows-v142 --config Release --target workflow_win7_audit
+cmake --build build/project --config Release --target workflow_lint
+cmake --build build/project --config Release --target workflow_win7_audit workflow_test_win7_audit
 ```
 
 涉及公共 CMake 接口或头文件时，还必须安装并验证独立消费项目：
 
 ```powershell
-cmake --install build/windows-v142 --config Release --prefix stage
-cmake -S tests/package_consumer -B build/package-consumer `
+cmake --install build/project --config Release --prefix build/sdk-stage
+cmake -S test/consumer -B build/consumer `
   -G "Visual Studio 17 2022" -A x64 -T v142 `
-  -Dworkflow_DIR="$pwd/stage/lib/cmake/workflow" `
+  -Dworkflow_DIR="$pwd/build/sdk-stage/lib/cmake/workflow" `
   -DCMAKE_PREFIX_PATH="$env:WORKFLOW_QT_ROOT;$env:WORKFLOW_OPENCV_DIR"
-cmake --build build/package-consumer --config Release
-ctest --test-dir build/package-consumer -C Release --output-on-failure
+cmake --build build/consumer --config Release
+ctest --test-dir build/consumer -C Release --output-on-failure
 ```
 
 ## 修改约定

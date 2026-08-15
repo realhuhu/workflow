@@ -18,7 +18,7 @@
 | RapidOCR | 源码、模型和字典已放入仓库 |
 
 OCR 运行时需要 `det.onnx`、`cls.onnx`、`rec.onnx` 和 `keys.txt`，默认位于
-`data/rapidocr/models/`。第三方许可证见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+`resource/model/`。第三方许可证见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 ONNX Runtime 固定为 1.13.1 是 Windows 7 兼容约束。官方 1.20.1 Windows 二进制会直接导入
 `CreateFile2` 和 `GetSystemTimePreciseAsFileTime` 等 Windows 8+ API，不能用于 Windows 7 发布包。
@@ -47,13 +47,13 @@ src/
 ├── support/                   # OCR、日志、资源路径、停止与计时
 └── third_party/rapidocr/       # RapidOCR 第三方实现
 
-examples/                      # 可运行示例
-tests/                         # 契约、OCR、图片匹配和 Win32 输入测试
-cmake/                         # 安装包、运行时部署、格式化和 Windows manifest
-scripts/                       # CI 依赖安装与 Windows 7 PE 导入审计
+example/                       # 可运行示例
+test/                          # 单元测试、消费验证、20 页可视化测试程序
+cmake/                         # CMake 安装、运行时部署、格式化和 Windows manifest
+tool/                          # CI 依赖安装、打包与 Windows 7 PE 导入审计
 .github/workflows/             # Windows 构建、测试、制品和标签发布
-data/rapidocr/models/          # OCR 模型与字典
-licenses/                      # 再分发许可证
+resource/model/                # OCR 模型与字典
+resource/license/              # 再分发许可证
 CONTRIBUTING.md                # 贡献、验证和提交约定
 SECURITY.md                    # 漏洞报告与 Win7 安全边界
 ```
@@ -407,7 +407,7 @@ image
     ->end();
 ```
 
-完整环境初始化和命令行 HWND 解析见 [examples/mixed_workflow.cpp](examples/mixed_workflow.cpp)。
+完整环境初始化和命令行 HWND 解析见 [example/mixed.cpp](example/mixed.cpp)。
 
 ## Windows 7 兼容范围
 
@@ -453,24 +453,24 @@ ctest --preset windows-release
 在 **x64 Native Tools Command Prompt for VS 2019** 中：
 
 ```powershell
-cmake -S . -B build -G "Visual Studio 16 2019" -A x64 `
+cmake -S . -B build/project -G "Visual Studio 16 2019" -A x64 `
   -DWORKFLOW_QT_ROOT="D:/Qt/5.15.2/msvc2019_64" `
   -DWORKFLOW_OPENCV_DIR="D:/CLibrary/opencv4100-world/build" `
   -DWORKFLOW_OPENCV_BIN_DIR="D:/CLibrary/opencv4100-world/build/x64/vc16/bin" `
   -DWORKFLOW_ONNXRUNTIME_ROOT="D:/CLibrary/onnxruntime-win-x64-1.13.1"
 
-cmake --build build --config Release --parallel
-ctest --test-dir build -C Release --output-on-failure
+cmake --build build/project --config Release --parallel
+ctest --test-dir build/project -C Release --output-on-failure
 ```
 
-项目作为顶层工程时默认构建静态库、`mixed_workflow_example` 和测试；通过 `add_subdirectory` 引入时，
+项目作为顶层工程时默认构建静态库、`workflow_example` 和测试；通过 `add_subdirectory` 引入时，
 示例和测试默认关闭。只构建库：
 
 ```powershell
-cmake -S . -B build `
+cmake -S . -B build/project `
   -DWORKFLOW_BUILD_EXAMPLES=OFF `
   -DWORKFLOW_BUILD_TESTS=OFF
-cmake --build build --parallel
+cmake --build build/project --parallel
 ```
 
 当前测试覆盖 21 组契约，包括：OCR ROI 裁剪和全局坐标回映射、空交集跳过推理、所有 Previous 区域、
@@ -482,7 +482,7 @@ scroll 时序以及真实 Win32 wheel 消息边界。
 构建后生成标准 CMake 安装树：
 
 ```powershell
-cmake --install build --config Release --prefix stage
+cmake --install build/project --config Release --prefix build/sdk-stage
 ```
 
 安装树包含公开头文件、`workflow.lib`、`workflow_rapidocr.lib`、ONNX Runtime import/runtime、五个
@@ -510,7 +510,7 @@ cmake -S . -B build `
 ```
 
 `workflow_stage_runtime()` 会把消费项目所使用的 Qt/OpenCV DLL、包内 ONNX Runtime、OCR 模型和
-许可证复制到目标可执行文件旁。仓库中的 `tests/package_consumer` 会在 CI 中从安装树重新配置和链接，
+许可证复制到目标可执行文件旁。仓库中的 `test/consumer` 会在 CI 中从安装树重新配置和链接，
 防止只在源码树中可用、安装后失效。
 
 也可以直接通过 `add_subdirectory()` 集成并链接 `workflow::workflow`。
@@ -522,14 +522,17 @@ cmake -S . -B build `
 1. 下载并校验固定版本依赖；
 2. clang-format 22 检查；
 3. Release 构建和 CTest；
-4. SDK 与 Browser UI 全部运行文件的 Windows 7 PE/import 审计；
-5. 安装 SDK并构建独立消费项目；
-6. 上传 SDK `workflow-<version>-windows-x64-win7sp1.zip`；
-7. 上传两个可直接运行的 Browser UI 示例：
-   - `workflow-browser-ui-<version>-windows-x64-win7-compatible.zip`：Windows 7 SP1 兼容版，额外包含
-     MSVC v142 CRT、应用本地 UCRT 和五个 API Set 转发 DLL；
-   - `workflow-browser-ui-<version>-windows-x64-slim.zip`：Windows 10+ 精简版，仅包含应用、Qt、
-     OpenCV、ONNX Runtime、OCR 模型和网页资源，要求系统已安装 Microsoft Visual C++ x64 运行库。
+4. SDK 与测试程序全部运行文件的 Windows 7 PE/import 审计；
+5. 安装 SDK 并构建独立消费项目；
+6. 发布四个命名明确的 ZIP：
+   - `workflow-sdk-<version>-windows-x64-slim.zip`
+   - `workflow-sdk-<version>-windows-x64-win7-compatible.zip`
+   - `workflow-test-<version>-windows-x64-slim.zip`
+   - `workflow-test-<version>-windows-x64-win7-compatible.zip`
+
+`slim` 面向 Windows 10+，只携带 Qt、OpenCV、ONNX Runtime 等必要 DLL，要求系统已安装 Microsoft
+Visual C++ x64 运行库。`win7-compatible` 额外携带 MSVC v142 CRT、应用本地 UCRT 和五个 API Set
+转发 DLL，可在完整更新的 Windows 7 SP1 x64 上直接运行。
 
 推送 `v*` 标签时还会构建 Debug 库，并通过 GitHub CLI 创建对应 Release。标签应与
 `project(workflow VERSION ...)` 保持一致。

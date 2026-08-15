@@ -4,6 +4,13 @@
 
 ## Unreleased
 
+## 0.1.3
+
+- 将仓库顶层收口为 `src`、`test`、`example`、`resource`、`tool` 和 `cmake`，删除被版本控制的 IDE 配置。
+- 统一本地与 CI 构建输出到 `build/`，测试程序改名为 `workflow-test.exe`。
+- Release 统一为 `workflow-sdk` 和 `workflow-test` 两类，并同时提供 `slim` 与 `win7-compatible` 版本。
+- SDK 运行包补齐 Qt Core、OpenCV 和 ONNX Runtime 必要 DLL；兼容版额外包含 v142 CRT、UCRT 和 Win7 转发层。
+
 ## 0.1.2
 
 - Browser UI Release 拆分为 Windows 7 SP1 兼容版和 Windows 10+ 精简版。

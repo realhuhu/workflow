@@ -41,7 +41,7 @@ jobs:
 
       - name: Install native dependencies
         shell: pwsh
-        run: ./scripts/Install-CiDependencies.ps1 -Destination "${{ runner.temp }}\workflow-dependencies"
+        run: ./tool/install.ps1 -Destination "${{ runner.temp }}\workflow-dependencies"
 
       - name: Configure
         shell: pwsh
@@ -49,7 +49,7 @@ jobs:
 
       - name: Check formatting
         shell: pwsh
-        run: cmake --build build/windows-v142 --config Release --target workflow_lint
+        run: cmake --build build/project --config Release --target workflow_lint
 
       - name: Build Release
         shell: pwsh
@@ -62,26 +62,26 @@ jobs:
       - name: Audit Windows 7 imports
         shell: pwsh
         run: >-
-          cmake --build build/windows-v142 --config Release
-          --target workflow_win7_audit workflow_browser_win7_audit
+          cmake --build build/project --config Release
+          --target workflow_win7_audit workflow_test_win7_audit
 
       - name: Install SDK
         shell: pwsh
-        run: cmake --install build/windows-v142 --config Release --prefix stage
+        run: cmake --install build/project --config Release --prefix build/sdk-stage
 
-      - name: Install Browser UI example
+      - name: Install test application
         shell: pwsh
         run: >-
-          cmake --install build/windows-v142 --config Release
-          --prefix browser-stage --component Browser
+          cmake --install build/project --config Release
+          --prefix build/test-stage --component Test
 
-      - name: Verify Browser UI package
+      - name: Verify test application
         shell: pwsh
         run: |
           $requiredFiles = @(
-            'workflow-browser-harness.exe',
+            'workflow-test.exe',
             'README.md',
-            'browser-test/index.html',
+            'test-page/index.html',
             'models/det.onnx',
             'models/rec.onnx',
             'Qt5WebEngineCore.dll',
@@ -96,28 +96,28 @@ jobs:
             'licenses/Qt-LGPL-GPL-3.0.txt'
           )
           foreach ($relativePath in $requiredFiles) {
-            $path = Join-Path "$pwd/browser-stage" $relativePath
+            $path = Join-Path "$pwd/build/test-stage" $relativePath
             if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
-              throw "Browser UI package is missing $relativePath"
+              throw "Test package is missing $relativePath"
             }
           }
 
       - name: Verify installed package consumer
         shell: pwsh
         run: |
-          cmake -S tests/package_consumer -B build/package-consumer `
+          cmake -S test/consumer -B build/consumer `
             -G "Visual Studio 17 2022" -A x64 -T v142 `
-            -Dworkflow_DIR="$pwd/stage/lib/cmake/workflow" `
+            -Dworkflow_DIR="$pwd/build/sdk-stage/lib/cmake/workflow" `
             -DCMAKE_PREFIX_PATH="$env:WORKFLOW_QT_ROOT;$env:WORKFLOW_OPENCV_DIR"
-          cmake --build build/package-consumer --config Release --parallel 2
-          ctest --test-dir build/package-consumer -C Release --output-on-failure
+          cmake --build build/consumer --config Release --parallel 2
+          ctest --test-dir build/consumer -C Release --output-on-failure
 
       - name: Add Debug SDK libraries for tagged releases
         if: github.ref_type == 'tag'
         shell: pwsh
         run: |
           cmake --build --preset windows-debug
-          cmake --install build/windows-v142 --config Debug --prefix stage
+          cmake --install build/project --config Debug --prefix build/sdk-stage
 
       - name: Create release archives
         id: package
@@ -129,52 +129,58 @@ jobs:
           if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$version") {
             throw "Tag $env:GITHUB_REF_NAME does not match project version v$version"
           }
-          New-Item -ItemType Directory -Force -Path dist | Out-Null
-          $archive = "$pwd/dist/workflow-$version-windows-x64-win7sp1.zip"
-          Compress-Archive -Path "$pwd/stage/*" -DestinationPath $archive -CompressionLevel Optimal
-          $checksum = "$archive.sha256"
-          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash.ToLowerInvariant()
-          "$hash  $([System.IO.Path]::GetFileName($archive))" |
-            Out-File -FilePath $checksum -Encoding ascii
-          $browserPackages = ./scripts/Package-Browser.ps1 `
-            -SourceDirectory "$pwd/browser-stage" `
-            -DestinationDirectory "$pwd/dist" `
+          $packages = ./tool/package.ps1 `
+            -SdkDirectory "$pwd/build/sdk-stage" `
+            -TestDirectory "$pwd/build/test-stage" `
+            -DestinationDirectory "$pwd/build/release" `
             -Version $version
-          "archive=$archive" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          "checksum=$checksum" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          "name=workflow-$version-windows-x64-win7sp1" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          "browser_slim_archive=$($browserPackages.SlimArchive)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          "browser_slim_checksum=$($browserPackages.SlimChecksum)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          "browser_slim_name=workflow-browser-ui-$version-windows-x64-slim" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          "browser_compatible_archive=$($browserPackages.CompatibleArchive)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          "browser_compatible_checksum=$($browserPackages.CompatibleChecksum)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          "browser_compatible_name=workflow-browser-ui-$version-windows-x64-win7-compatible" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "sdk_slim_archive=$($packages.SdkSlimArchive)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "sdk_slim_checksum=$($packages.SdkSlimChecksum)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "sdk_slim_name=workflow-sdk-$version-windows-x64-slim" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "sdk_compatible_archive=$($packages.SdkCompatibleArchive)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "sdk_compatible_checksum=$($packages.SdkCompatibleChecksum)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "sdk_compatible_name=workflow-sdk-$version-windows-x64-win7-compatible" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "test_slim_archive=$($packages.TestSlimArchive)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "test_slim_checksum=$($packages.TestSlimChecksum)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "test_slim_name=workflow-test-$version-windows-x64-slim" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "test_compatible_archive=$($packages.TestCompatibleArchive)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "test_compatible_checksum=$($packages.TestCompatibleChecksum)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "test_compatible_name=workflow-test-$version-windows-x64-win7-compatible" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
-      - name: Upload SDK artifact
+      - name: Upload slim SDK artifact
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ steps.package.outputs.name }}
+          name: ${{ steps.package.outputs.sdk_slim_name }}
           path: |
-            ${{ steps.package.outputs.archive }}
-            ${{ steps.package.outputs.checksum }}
+            ${{ steps.package.outputs.sdk_slim_archive }}
+            ${{ steps.package.outputs.sdk_slim_checksum }}
           if-no-files-found: error
 
-      - name: Upload slim Browser UI artifact
+      - name: Upload Windows 7 compatible SDK artifact
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ steps.package.outputs.browser_slim_name }}
+          name: ${{ steps.package.outputs.sdk_compatible_name }}
           path: |
-            ${{ steps.package.outputs.browser_slim_archive }}
-            ${{ steps.package.outputs.browser_slim_checksum }}
+            ${{ steps.package.outputs.sdk_compatible_archive }}
+            ${{ steps.package.outputs.sdk_compatible_checksum }}
           if-no-files-found: error
 
-      - name: Upload Windows 7 compatible Browser UI artifact
+      - name: Upload slim test artifact
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ steps.package.outputs.browser_compatible_name }}
+          name: ${{ steps.package.outputs.test_slim_name }}
           path: |
-            ${{ steps.package.outputs.browser_compatible_archive }}
-            ${{ steps.package.outputs.browser_compatible_checksum }}
+            ${{ steps.package.outputs.test_slim_archive }}
+            ${{ steps.package.outputs.test_slim_checksum }}
+          if-no-files-found: error
+
+      - name: Upload Windows 7 compatible test artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.package.outputs.test_compatible_name }}
+          path: |
+            ${{ steps.package.outputs.test_compatible_archive }}
+            ${{ steps.package.outputs.test_compatible_checksum }}
           if-no-files-found: error
 
       - name: Publish GitHub release
@@ -186,20 +192,24 @@ jobs:
           gh release view $env:GITHUB_REF_NAME *> $null
           if ($LASTEXITCODE -eq 0) {
             gh release upload $env:GITHUB_REF_NAME `
-              "${{ steps.package.outputs.archive }}" `
-              "${{ steps.package.outputs.checksum }}" `
-              "${{ steps.package.outputs.browser_slim_archive }}" `
-              "${{ steps.package.outputs.browser_slim_checksum }}" `
-              "${{ steps.package.outputs.browser_compatible_archive }}" `
-              "${{ steps.package.outputs.browser_compatible_checksum }}" `
+              "${{ steps.package.outputs.sdk_slim_archive }}" `
+              "${{ steps.package.outputs.sdk_slim_checksum }}" `
+              "${{ steps.package.outputs.sdk_compatible_archive }}" `
+              "${{ steps.package.outputs.sdk_compatible_checksum }}" `
+              "${{ steps.package.outputs.test_slim_archive }}" `
+              "${{ steps.package.outputs.test_slim_checksum }}" `
+              "${{ steps.package.outputs.test_compatible_archive }}" `
+              "${{ steps.package.outputs.test_compatible_checksum }}" `
               --clobber
           } else {
             gh release create $env:GITHUB_REF_NAME `
-              "${{ steps.package.outputs.archive }}" `
-              "${{ steps.package.outputs.checksum }}" `
-              "${{ steps.package.outputs.browser_slim_archive }}" `
-              "${{ steps.package.outputs.browser_slim_checksum }}" `
-              "${{ steps.package.outputs.browser_compatible_archive }}" `
-              "${{ steps.package.outputs.browser_compatible_checksum }}" `
+              "${{ steps.package.outputs.sdk_slim_archive }}" `
+              "${{ steps.package.outputs.sdk_slim_checksum }}" `
+              "${{ steps.package.outputs.sdk_compatible_archive }}" `
+              "${{ steps.package.outputs.sdk_compatible_checksum }}" `
+              "${{ steps.package.outputs.test_slim_archive }}" `
+              "${{ steps.package.outputs.test_slim_checksum }}" `
+              "${{ steps.package.outputs.test_compatible_archive }}" `
+              "${{ steps.package.outputs.test_compatible_checksum }}" `
               --generate-notes --verify-tag
           }

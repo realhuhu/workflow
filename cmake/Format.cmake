@@ -41,18 +41,18 @@ file(GLOB_RECURSE WORKFLOW_FORMAT_FILES LIST_DIRECTORIES false
         "${WORKFLOW_ROOT}/src/*.cxx"
         "${WORKFLOW_ROOT}/src/*.h"
         "${WORKFLOW_ROOT}/src/*.hpp"
-        "${WORKFLOW_ROOT}/examples/*.c"
-        "${WORKFLOW_ROOT}/examples/*.cc"
-        "${WORKFLOW_ROOT}/examples/*.cpp"
-        "${WORKFLOW_ROOT}/examples/*.cxx"
-        "${WORKFLOW_ROOT}/examples/*.h"
-        "${WORKFLOW_ROOT}/examples/*.hpp"
-        "${WORKFLOW_ROOT}/tests/*.c"
-        "${WORKFLOW_ROOT}/tests/*.cc"
-        "${WORKFLOW_ROOT}/tests/*.cpp"
-        "${WORKFLOW_ROOT}/tests/*.cxx"
-        "${WORKFLOW_ROOT}/tests/*.h"
-        "${WORKFLOW_ROOT}/tests/*.hpp")
+        "${WORKFLOW_ROOT}/example/*.c"
+        "${WORKFLOW_ROOT}/example/*.cc"
+        "${WORKFLOW_ROOT}/example/*.cpp"
+        "${WORKFLOW_ROOT}/example/*.cxx"
+        "${WORKFLOW_ROOT}/example/*.h"
+        "${WORKFLOW_ROOT}/example/*.hpp"
+        "${WORKFLOW_ROOT}/test/*.c"
+        "${WORKFLOW_ROOT}/test/*.cc"
+        "${WORKFLOW_ROOT}/test/*.cpp"
+        "${WORKFLOW_ROOT}/test/*.cxx"
+        "${WORKFLOW_ROOT}/test/*.h"
+        "${WORKFLOW_ROOT}/test/*.hpp")
 list(FILTER WORKFLOW_FORMAT_FILES EXCLUDE REGEX "[/\\]src[/\\]third_party[/\\]")
 list(SORT WORKFLOW_FORMAT_FILES)
 

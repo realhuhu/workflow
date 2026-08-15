@@ -828,8 +828,8 @@ namespace {
 
 } // namespace
 
-const std::vector<BrowserCase>& browserCases() {
-    static const std::vector<BrowserCase> cases{
+const std::vector<TestCase>& testCases() {
+    static const std::vector<TestCase> cases{
         {1,
             "static-image",
             "静态图片点击",
@@ -980,7 +980,7 @@ const std::vector<BrowserCase>& browserCases() {
     return cases;
 }
 
-void runBrowserCase(
+void runTestCase(
     const int id
 ) {
     switch (id) {

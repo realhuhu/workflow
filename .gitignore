@@ -40,9 +40,7 @@ qrc_*.cpp
 ui_*.h
 
 # Editors and operating system files
-/.idea/*
-!/.idea/dictionaries/
-!/.idea/dictionaries/workflow.xml
+/.idea/
 /.vscode/
 *.user
 *.suo

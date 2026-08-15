@@ -1,7 +1,10 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [string] $SourceDirectory,
+    [string] $SdkDirectory,
+
+    [Parameter(Mandatory = $true)]
+    [string] $TestDirectory,
 
     [Parameter(Mandatory = $true)]
     [string] $DestinationDirectory,
@@ -37,10 +40,10 @@ $win7ShimNames = @(
     'api-ms-win-core-heap-l2-1-0.dll',
     'api-ms-win-core-shlwapi-legacy-l1-1-0.dll'
 )
-$commonRequiredPaths = @(
-    'workflow-browser-harness.exe',
+$testRequiredPaths = @(
+    'workflow-test.exe',
     'README.md',
-    'browser-test\index.html',
+    'test-page\index.html',
     'models\det.onnx',
     'models\rec.onnx',
     'onnxruntime.dll',
@@ -50,6 +53,17 @@ $commonRequiredPaths = @(
     'QtWebEngineProcess.exe',
     'resources\icudtl.dat',
     'licenses\Qt-LGPL-GPL-3.0.txt'
+)
+$sdkRequiredPaths = @(
+    'include\workflow.h',
+    'lib\workflow.lib',
+    'lib\workflow_rapidocr.lib',
+    'lib\onnxruntime.lib',
+    'lib\cmake\workflow\workflowConfig.cmake',
+    'bin\onnxruntime.dll',
+    'share\workflow\models\det.onnx',
+    'share\workflow\models\rec.onnx',
+    'share\workflow\licenses\Qt-LGPL-GPL-3.0.txt'
 )
 
 function Resolve-ExistingDirectory(
@@ -186,20 +200,42 @@ function Reset-ChildDirectory(
     return $resolved
 }
 
-function Assert-CommonPackageFiles(
+function Assert-TestPackageFiles(
     [string] $Root
 ) {
-    foreach ($relativePath in $commonRequiredPaths) {
+    foreach ($relativePath in $testRequiredPaths) {
         $path = Join-Path $Root $relativePath
         if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
-            throw "Browser package is missing $relativePath"
+            throw "Test package is missing $relativePath"
         }
     }
     $opencvRuntime = Get-ChildItem -LiteralPath $Root -File |
         Where-Object Name -Match '^opencv_(world|core)4100\.dll$' |
         Select-Object -First 1
     if (-not $opencvRuntime) {
-        throw 'Browser package is missing the OpenCV 4.10 runtime'
+        throw 'Test package is missing the OpenCV 4.10 runtime'
+    }
+}
+
+function Assert-SdkPackageFiles(
+    [string] $Root
+) {
+    foreach ($relativePath in $sdkRequiredPaths) {
+        $path = Join-Path $Root $relativePath
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+            throw "SDK package is missing $relativePath"
+        }
+    }
+    foreach ($runtime in @('Qt5Core.dll', 'onnxruntime.dll')) {
+        if (-not (Test-Path -LiteralPath (Join-Path $Root "bin\$runtime") -PathType Leaf)) {
+            throw "SDK package is missing bin\$runtime"
+        }
+    }
+    $opencvRuntime = Get-ChildItem -LiteralPath (Join-Path $Root 'bin') -File |
+        Where-Object Name -Match '^opencv_(world|core)4100\.dll$' |
+        Select-Object -First 1
+    if (-not $opencvRuntime) {
+        throw 'SDK package is missing the OpenCV 4.10 runtime'
     }
 }
 
@@ -245,7 +281,19 @@ function Write-Checksum(
     return $checksum
 }
 
-$source = Resolve-ExistingDirectory $SourceDirectory 'Browser source directory'
+function Write-PackageVariant(
+    [string] $Root,
+    [string[]] $Description
+) {
+    [System.IO.File]::WriteAllLines(
+        (Join-Path $Root 'PACKAGE_VARIANT.txt'),
+        $Description,
+        [System.Text.UTF8Encoding]::new($false)
+    )
+}
+
+$sdkSource = Resolve-ExistingDirectory $SdkDirectory 'SDK source directory'
+$testSource = Resolve-ExistingDirectory $TestDirectory 'Test source directory'
 $destination = [System.IO.Path]::GetFullPath($DestinationDirectory)
 New-Item -ItemType Directory -Force -Path $destination | Out-Null
 $vcRuntime = Find-VcRuntimeDirectory
@@ -258,86 +306,135 @@ foreach ($name in $crtNames) {
     }
 }
 foreach ($name in $win7ShimNames) {
-    if (-not (Test-Path -LiteralPath (Join-Path $source $name) -PathType Leaf)) {
-        throw "Browser source directory is missing the Win7 shim $name"
+    if (-not (Test-Path -LiteralPath (Join-Path $sdkSource "bin\$name") -PathType Leaf)) {
+        throw "SDK source directory is missing the Win7 shim $name"
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $testSource $name) -PathType Leaf)) {
+        throw "Test source directory is missing the Win7 shim $name"
     }
 }
 
 $workRoot = Reset-ChildDirectory `
-    (Join-Path $destination ".browser-package-$([guid]::NewGuid().ToString('N'))") `
+    (Join-Path $destination ".package-$([guid]::NewGuid().ToString('N'))") `
     $destination
-$slimRoot = New-Item -ItemType Directory -Path (Join-Path $workRoot 'slim')
-$compatibleRoot = New-Item -ItemType Directory -Path (Join-Path $workRoot 'compatible')
-Get-ChildItem -LiteralPath $source -Force |
-    Copy-Item -Destination $slimRoot.FullName -Recurse -Force
-Get-ChildItem -LiteralPath $source -Force |
-    Copy-Item -Destination $compatibleRoot.FullName -Recurse -Force
-$browserReadme = [System.IO.Path]::GetFullPath(
-    (Join-Path $PSScriptRoot '..\tests\browser\README.md')
-)
-Copy-Item -LiteralPath $browserReadme `
-    -Destination (Join-Path $slimRoot.FullName 'README.md') -Force
-Copy-Item -LiteralPath $browserReadme `
-    -Destination (Join-Path $compatibleRoot.FullName 'README.md') -Force
+$sdkSlimRoot = New-Item -ItemType Directory -Path (Join-Path $workRoot 'sdk-slim')
+$sdkCompatibleRoot = New-Item -ItemType Directory -Path (Join-Path $workRoot 'sdk-compatible')
+$testSlimRoot = New-Item -ItemType Directory -Path (Join-Path $workRoot 'test-slim')
+$testCompatibleRoot = New-Item -ItemType Directory -Path (Join-Path $workRoot 'test-compatible')
+
+foreach ($root in @($sdkSlimRoot, $sdkCompatibleRoot)) {
+    Get-ChildItem -LiteralPath $sdkSource -Force |
+        Copy-Item -Destination $root.FullName -Recurse -Force
+    $bin = Join-Path $root.FullName 'bin'
+    Copy-Item -LiteralPath (Join-Path $testSource 'Qt5Core.dll') -Destination $bin -Force
+    Get-ChildItem -LiteralPath $testSource -File |
+        Where-Object Name -Match '^opencv_.*4100\.dll$' |
+        Copy-Item -Destination $bin -Force
+}
+foreach ($root in @($testSlimRoot, $testCompatibleRoot)) {
+    Get-ChildItem -LiteralPath $testSource -Force |
+        Copy-Item -Destination $root.FullName -Recurse -Force
+}
 
 $slimRuntimePattern = '^(concrt140|msvcp140.*|vcruntime140.*|vccorlib140|ucrtbase|api-ms-win-(?:crt|core|eventing).*)\.dll$'
-Get-ChildItem -LiteralPath $slimRoot.FullName -File |
-    Where-Object Name -Match $slimRuntimePattern |
-    ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force }
-
-foreach ($name in $crtNames) {
-    Copy-Item -LiteralPath (Join-Path $vcRuntime $name) `
-        -Destination $compatibleRoot.FullName -Force
+foreach ($root in @(
+    (Join-Path $sdkSlimRoot.FullName 'bin'),
+    $testSlimRoot.FullName
+)) {
+    Get-ChildItem -LiteralPath $root -File |
+        Where-Object Name -Match $slimRuntimePattern |
+        ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force }
 }
-Get-ChildItem -LiteralPath $ucrtRuntime -File -Filter '*.dll' |
-    Copy-Item -Destination $compatibleRoot.FullName -Force
 
-$slimDescription = @(
+foreach ($root in @(
+    (Join-Path $sdkCompatibleRoot.FullName 'bin'),
+    $testCompatibleRoot.FullName
+)) {
+    foreach ($name in $crtNames) {
+        Copy-Item -LiteralPath (Join-Path $vcRuntime $name) -Destination $root -Force
+    }
+    Get-ChildItem -LiteralPath $ucrtRuntime -File -Filter '*.dll' |
+        Copy-Item -Destination $root -Force
+}
+
+$sdkSlimDescription = @(
+    'Package: Workflow SDK',
     'Variant: slim',
     'Requires: Windows 10 x64 and Microsoft Visual C++ 2015-2022 Redistributable x64.',
-    'Contains: Workflow Browser UI, Qt, OpenCV, ONNX Runtime, OCR models, fixtures, and licenses.'
+    'Contains: headers, libraries, CMake package files, Qt Core, OpenCV, ONNX Runtime, OCR models, and licenses.'
 )
-$compatibleDescription = @(
+$sdkCompatibleDescription = @(
+    'Package: Workflow SDK',
     'Variant: Windows 7 SP1 compatible',
     'Requires: Windows 7 SP1 x64 or newer.',
-    'Contains: slim files plus MSVC v142 CRT, app-local UCRT, and Win7 API-set forwarders.'
+    'Contains: SDK slim files plus MSVC v142 CRT, app-local UCRT, and Win7 API-set forwarders.'
 )
-[System.IO.File]::WriteAllLines(
-    (Join-Path $slimRoot.FullName 'PACKAGE_VARIANT.txt'),
-    $slimDescription,
-    [System.Text.UTF8Encoding]::new($false)
+$testSlimDescription = @(
+    'Package: Workflow Test',
+    'Variant: slim',
+    'Requires: Windows 10 x64 and Microsoft Visual C++ 2015-2022 Redistributable x64.',
+    'Contains: test application, Qt, OpenCV, ONNX Runtime, OCR models, 20 test pages, and licenses.'
 )
-[System.IO.File]::WriteAllLines(
-    (Join-Path $compatibleRoot.FullName 'PACKAGE_VARIANT.txt'),
-    $compatibleDescription,
-    [System.Text.UTF8Encoding]::new($false)
+$testCompatibleDescription = @(
+    'Package: Workflow Test',
+    'Variant: Windows 7 SP1 compatible',
+    'Requires: Windows 7 SP1 x64 or newer.',
+    'Contains: test slim files plus MSVC v142 CRT, app-local UCRT, and Win7 API-set forwarders.'
 )
+Write-PackageVariant $sdkSlimRoot.FullName $sdkSlimDescription
+Write-PackageVariant $sdkCompatibleRoot.FullName $sdkCompatibleDescription
+Write-PackageVariant $testSlimRoot.FullName $testSlimDescription
+Write-PackageVariant $testCompatibleRoot.FullName $testCompatibleDescription
 
-Assert-CommonPackageFiles $slimRoot.FullName
-Assert-CommonPackageFiles $compatibleRoot.FullName
-$unexpectedSlimRuntime = Get-ChildItem -LiteralPath $slimRoot.FullName -File |
-    Where-Object Name -Match $slimRuntimePattern |
-    Select-Object -First 1
-if ($unexpectedSlimRuntime) {
-    throw "Slim package contains $($unexpectedSlimRuntime.Name)"
-}
-foreach ($name in $crtNames + $win7ShimNames + @(
-    'ucrtbase.dll',
-    'api-ms-win-crt-runtime-l1-1-0.dll'
+Assert-SdkPackageFiles $sdkSlimRoot.FullName
+Assert-SdkPackageFiles $sdkCompatibleRoot.FullName
+Assert-TestPackageFiles $testSlimRoot.FullName
+Assert-TestPackageFiles $testCompatibleRoot.FullName
+foreach ($root in @(
+    (Join-Path $sdkSlimRoot.FullName 'bin'),
+    $testSlimRoot.FullName
 )) {
-    if (-not (Test-Path -LiteralPath (Join-Path $compatibleRoot.FullName $name) -PathType Leaf)) {
-        throw "Compatible package is missing $name"
+    $unexpectedRuntime = Get-ChildItem -LiteralPath $root -File |
+        Where-Object Name -Match $slimRuntimePattern |
+        Select-Object -First 1
+    if ($unexpectedRuntime) {
+        throw "Slim package contains $($unexpectedRuntime.Name)"
     }
 }
-Assert-CompatibleApiSetClosure $compatibleRoot.FullName $dumpbinPath
+foreach ($root in @(
+    (Join-Path $sdkCompatibleRoot.FullName 'bin'),
+    $testCompatibleRoot.FullName
+)) {
+    foreach ($name in $crtNames + $win7ShimNames + @(
+        'ucrtbase.dll',
+        'api-ms-win-crt-runtime-l1-1-0.dll'
+    )) {
+        if (-not (Test-Path -LiteralPath (Join-Path $root $name) -PathType Leaf)) {
+            throw "Compatible package is missing $name"
+        }
+    }
+}
+Assert-CompatibleApiSetClosure $sdkCompatibleRoot.FullName $dumpbinPath
+Assert-CompatibleApiSetClosure $testCompatibleRoot.FullName $dumpbinPath
 
-$slimArchive = Assert-ChildPath `
-    (Join-Path $destination "workflow-browser-ui-$Version-windows-x64-slim.zip") `
+$sdkSlimArchive = Assert-ChildPath `
+    (Join-Path $destination "workflow-sdk-$Version-windows-x64-slim.zip") `
     $destination
-$compatibleArchive = Assert-ChildPath `
-    (Join-Path $destination "workflow-browser-ui-$Version-windows-x64-win7-compatible.zip") `
+$sdkCompatibleArchive = Assert-ChildPath `
+    (Join-Path $destination "workflow-sdk-$Version-windows-x64-win7-compatible.zip") `
     $destination
-foreach ($archive in @($slimArchive, $compatibleArchive)) {
+$testSlimArchive = Assert-ChildPath `
+    (Join-Path $destination "workflow-test-$Version-windows-x64-slim.zip") `
+    $destination
+$testCompatibleArchive = Assert-ChildPath `
+    (Join-Path $destination "workflow-test-$Version-windows-x64-win7-compatible.zip") `
+    $destination
+foreach ($archive in @(
+    $sdkSlimArchive,
+    $sdkCompatibleArchive,
+    $testSlimArchive,
+    $testCompatibleArchive
+)) {
     if (Test-Path -LiteralPath $archive) {
         Remove-Item -LiteralPath $archive -Force
     }
@@ -345,20 +442,30 @@ foreach ($archive in @($slimArchive, $compatibleArchive)) {
         Remove-Item -LiteralPath "$archive.sha256" -Force
     }
 }
-Compress-Archive -Path (Join-Path $slimRoot.FullName '*') `
-    -DestinationPath $slimArchive -CompressionLevel Optimal
-Compress-Archive -Path (Join-Path $compatibleRoot.FullName '*') `
-    -DestinationPath $compatibleArchive -CompressionLevel Optimal
-$slimChecksum = Write-Checksum $slimArchive
-$compatibleChecksum = Write-Checksum $compatibleArchive
+Compress-Archive -Path (Join-Path $sdkSlimRoot.FullName '*') `
+    -DestinationPath $sdkSlimArchive -CompressionLevel Optimal
+Compress-Archive -Path (Join-Path $sdkCompatibleRoot.FullName '*') `
+    -DestinationPath $sdkCompatibleArchive -CompressionLevel Optimal
+Compress-Archive -Path (Join-Path $testSlimRoot.FullName '*') `
+    -DestinationPath $testSlimArchive -CompressionLevel Optimal
+Compress-Archive -Path (Join-Path $testCompatibleRoot.FullName '*') `
+    -DestinationPath $testCompatibleArchive -CompressionLevel Optimal
+$sdkSlimChecksum = Write-Checksum $sdkSlimArchive
+$sdkCompatibleChecksum = Write-Checksum $sdkCompatibleArchive
+$testSlimChecksum = Write-Checksum $testSlimArchive
+$testCompatibleChecksum = Write-Checksum $testCompatibleArchive
 
 Remove-Item -LiteralPath $workRoot -Recurse -Force
 
 [pscustomobject] @{
-    SlimArchive = $slimArchive
-    SlimChecksum = $slimChecksum
-    CompatibleArchive = $compatibleArchive
-    CompatibleChecksum = $compatibleChecksum
+    SdkSlimArchive = $sdkSlimArchive
+    SdkSlimChecksum = $sdkSlimChecksum
+    SdkCompatibleArchive = $sdkCompatibleArchive
+    SdkCompatibleChecksum = $sdkCompatibleChecksum
+    TestSlimArchive = $testSlimArchive
+    TestSlimChecksum = $testSlimChecksum
+    TestCompatibleArchive = $testCompatibleArchive
+    TestCompatibleChecksum = $testCompatibleChecksum
     VcRuntimeDirectory = $vcRuntime
     UcrtRuntimeDirectory = $ucrtRuntime
 }

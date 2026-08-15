@@ -12,7 +12,7 @@
     var markerRoot = "../游戏图片/fixtures/";
 
     if (!definition) {
-        root.textContent = "Unknown browser fixture: " + slug;
+        root.textContent = "Unknown test page: " + slug;
         return;
     }
 

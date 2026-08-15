@@ -83,7 +83,7 @@ int main(
     QCoreApplication application(argc, argv);
     const QStringList arguments = application.arguments();
     if (arguments.size() < 3) {
-        qInfo().noquote() << "用法: mixed_workflow_example <HWND十六进制或十进制> <入口模板图片路径>";
+        qInfo().noquote() << "用法: workflow_example <HWND十六进制或十进制> <入口模板图片路径>";
         return 0;
     }
 

@@ -1,4 +1,4 @@
-#include "browser.h"
+#include "window.h"
 
 #include <QApplication>
 #include <QLocale>
@@ -14,12 +14,12 @@ int main(
     QLocale::setDefault(QLocale(QLocale::Chinese, QLocale::China));
 
     QApplication application(argc, argv);
-    QApplication::setApplicationName(QStringLiteral("workflow-browser-harness"));
+    QApplication::setApplicationName(QStringLiteral("workflow-test"));
     QApplication::setOrganizationName(QStringLiteral("workflow"));
     QApplication::setStyle(QStyleFactory::create(QStringLiteral("Fusion")));
 
     try {
-        FixtureBrowserWindow window;
+        TestWindow window;
         window.show();
         return QApplication::exec();
     } catch (const std::exception& exception) {
