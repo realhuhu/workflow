@@ -1,0 +1,465 @@
+:root {
+    color-scheme: dark;
+    --ink: #0a0f14;
+    --panel: #111820;
+    --line: #2b3840;
+    --paper: #f7f3e8;
+    --muted: #8fa2aa;
+    --yellow: #f2c94c;
+    --cyan: #27d7e6;
+    --green: #70e1a1;
+    --red: #ff6b6b;
+    --orange: #ff6b35;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+    font-synthesis: none;
+    text-rendering: geometricPrecision;
+}
+
+body::before {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    content: "";
+    opacity: 0.22;
+    background-image:
+        linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.index-page {
+    padding: 22px 24px 20px;
+}
+
+#index-root {
+    position: relative;
+    z-index: 1;
+    height: 100%;
+}
+
+.index-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    height: 82px;
+    border-bottom: 2px solid var(--yellow);
+}
+
+.overline {
+    display: block;
+    margin-bottom: 7px;
+    color: var(--yellow);
+    font: 700 11px/1 "Consolas", monospace;
+    letter-spacing: 2.2px;
+}
+
+.index-header h1 {
+    margin: 0 0 13px;
+    color: var(--paper);
+    font-size: 31px;
+    line-height: 1;
+    letter-spacing: 2px;
+}
+
+.calibration-chip {
+    margin-bottom: 12px;
+    padding: 6px 10px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--muted);
+    font: 700 11px/1 "Consolas", monospace;
+    letter-spacing: 1px;
+}
+
+.calibration-chip[data-ok="true"] {
+    border-color: var(--green);
+    color: var(--green);
+}
+
+.calibration-chip[data-ok="false"] {
+    border-color: var(--red);
+    color: var(--red);
+}
+
+.index-intro {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 58px;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.index-intro p {
+    margin: 0;
+}
+
+.index-intro span {
+    color: var(--cyan);
+    font: 12px "Consolas", monospace;
+}
+
+.case-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 9px;
+    height: 616px;
+}
+
+.case-card {
+    position: relative;
+    display: grid;
+    grid-template-columns: 34px 1fr auto;
+    grid-template-rows: 20px 24px 21px 1fr;
+    gap: 2px 9px;
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid var(--line);
+    background: rgba(17, 24, 32, 0.94);
+    overflow: hidden;
+}
+
+.case-card::after {
+    position: absolute;
+    right: -18px;
+    bottom: -18px;
+    width: 44px;
+    height: 44px;
+    border: 1px solid rgba(242, 201, 76, 0.25);
+    content: "";
+    transform: rotate(45deg);
+}
+
+.case-card:hover {
+    border-color: var(--yellow);
+    background: #172129;
+}
+
+.case-number {
+    grid-row: 1 / span 2;
+    color: var(--yellow);
+    font: 700 24px/1 "Consolas", monospace;
+}
+
+.case-group {
+    justify-self: end;
+    color: var(--cyan);
+    font: 700 10px/1 "Consolas", monospace;
+    letter-spacing: 1px;
+}
+
+.case-card strong {
+    grid-column: 2 / span 2;
+    overflow: hidden;
+    font-size: 14px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.case-card code {
+    grid-column: 2 / span 2;
+    overflow: hidden;
+    color: var(--green);
+    font: 10px "Consolas", monospace;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.case-card small {
+    grid-column: 1 / span 3;
+    align-self: end;
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.45;
+}
+
+.case-page {
+    position: relative;
+}
+
+#case-root {
+    position: relative;
+    z-index: 1;
+    width: 1000px;
+    height: 800px;
+}
+
+.case-header {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: grid;
+    grid-template-columns: 92px 1fr 210px;
+    align-items: center;
+    width: 1000px;
+    height: 120px;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(10, 15, 20, 0.96);
+}
+
+.case-id {
+    color: var(--yellow);
+    font: 700 44px/1 "Consolas", monospace;
+}
+
+.case-copy h1 {
+    margin: 0 0 6px;
+    font-size: 23px;
+    letter-spacing: 1px;
+}
+
+.case-copy p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.case-meta {
+    text-align: right;
+}
+
+.case-meta code {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--cyan);
+    font: 11px "Consolas", monospace;
+}
+
+.case-result {
+    display: inline-block;
+    padding: 6px 9px;
+    border: 1px solid var(--line);
+    color: var(--muted);
+    font: 700 11px "Consolas", monospace;
+    letter-spacing: 1px;
+}
+
+.case-result[data-state="pass"] {
+    border-color: var(--green);
+    color: var(--green);
+}
+
+.case-result[data-state="fail"] {
+    border-color: var(--red);
+    color: var(--red);
+}
+
+.fixture-stage {
+    position: absolute;
+    top: 120px;
+    left: 20px;
+    width: 960px;
+    height: 660px;
+    border: 2px solid #3b4951;
+    overflow: hidden;
+    contain: strict;
+    isolation: isolate;
+    background: #131b22;
+}
+
+.fixture-stage::before {
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    content: "";
+    background-image:
+        linear-gradient(rgba(39, 215, 230, 0.055) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(39, 215, 230, 0.055) 1px, transparent 1px);
+    background-size: 24px 24px;
+}
+
+.fixture-stage::after {
+    position: absolute;
+    right: 10px;
+    bottom: 8px;
+    z-index: -1;
+    content: "960 × 660 FIXTURE FIELD";
+    color: #41515a;
+    font: 10px "Consolas", monospace;
+    letter-spacing: 1px;
+}
+
+.stage-label {
+    position: absolute;
+    top: 18px;
+    left: 20px;
+    color: #70828b;
+    font: 11px "Consolas", monospace;
+    letter-spacing: 1.4px;
+}
+
+.fixture-marker {
+    position: absolute;
+    display: block;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    image-rendering: pixelated;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+.fixture-marker.clickable,
+.ocr-target.clickable {
+    cursor: crosshair;
+}
+
+.ocr-target {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 56px;
+    padding: 0 22px;
+    border: 2px solid var(--paper);
+    background: #f7f3e8;
+    color: #091017;
+    font: 700 31px/1 "Microsoft YaHei", "SimHei", sans-serif;
+    letter-spacing: 2px;
+    white-space: nowrap;
+    user-select: none;
+}
+
+.control-marker {
+    box-shadow: 0 0 0 8px rgba(242, 201, 76, 0.08);
+}
+
+.roi-box {
+    position: absolute;
+    border: 2px dashed var(--cyan);
+    background: rgba(39, 215, 230, 0.035);
+    pointer-events: none;
+}
+
+.roi-box::before {
+    position: absolute;
+    top: -24px;
+    left: -2px;
+    content: "MATCH ROI";
+    color: var(--cyan);
+    font: 10px "Consolas", monospace;
+    letter-spacing: 1px;
+}
+
+.completion {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 280px;
+    height: 62px;
+    padding: 0 22px;
+    border: 2px solid var(--green);
+    background: #0d291d;
+    color: #e9fff2;
+    font: 700 27px/1 "Microsoft YaHei", "Consolas", sans-serif;
+    letter-spacing: 1px;
+}
+
+.counter {
+    position: absolute;
+    color: var(--muted);
+    font: 700 16px "Consolas", monospace;
+}
+
+.drop-zone {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px dashed var(--yellow);
+    background: rgba(242, 201, 76, 0.06);
+    color: var(--yellow);
+    font: 700 12px "Consolas", monospace;
+    letter-spacing: 2px;
+}
+
+.scroll-viewport {
+    position: absolute;
+    overflow-y: scroll;
+    border: 2px solid #52636c;
+    background: #0c1319;
+    scrollbar-color: #52636c #0c1319;
+}
+
+.scroll-content {
+    position: relative;
+    min-height: 1600px;
+    background-image: linear-gradient(to bottom, transparent 0, transparent 119px, rgba(242, 201, 76, 0.08) 120px);
+    background-size: 100% 120px;
+}
+
+.scroll-anchor {
+    position: sticky;
+    top: 20px;
+    z-index: 4;
+    margin: 20px 0 0 274px;
+}
+
+.scroll-finish {
+    position: absolute;
+    left: 134px;
+    bottom: 48px;
+}
+
+.overlay-panel {
+    position: absolute;
+    z-index: 8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #4b5961;
+    background: #26323a;
+    color: #aab6bc;
+    font: 700 12px "Consolas", monospace;
+    letter-spacing: 2px;
+}
+
+.environment-blocker {
+    position: absolute;
+    inset: 0;
+    z-index: 100;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(65, 9, 13, 0.96);
+    color: #fff0f0;
+    text-align: center;
+}
+
+.environment-blocker strong {
+    display: block;
+    margin-bottom: 12px;
+    font-size: 27px;
+}
+
+.environment-blocker code {
+    font: 14px "Consolas", monospace;
+}
+
+html[data-environment="invalid"] .environment-blocker {
+    display: flex;
+}

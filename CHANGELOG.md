@@ -4,6 +4,14 @@
 
 ## Unreleased
 
+## 0.1.1
+
+- 保留 `run/finish → _createNext` 链传播，并允许 `ClickerBase` 直接使用图片或文字 RunConfig，混合链不再需要 `dynamic_cast`。
+- 增加基于 Qt WebEngine 的 Browser UI 校准台，提供 20 个图片、文字和混合链自动化页面。
+- GitHub Release 新增独立 Browser UI 运行包，包含示例 EXE、网页用例、OCR 模型及完整运行时。
+- 修复 Clicker 动作重载的隐藏关系、Until 安全向下转换和静态检查告警。
+- 扩展 Windows 7 PE/import 审计，使其覆盖 Browser UI 目录中的全部 EXE 和 DLL。
+
 ## 0.1.0
 
 - 提供图片匹配、OCR 文字匹配、ROI 裁剪、Until 条件链和鼠标滚轮工作流。

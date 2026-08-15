@@ -13,3 +13,8 @@ target_link_libraries(workflow_windows_target_contract PRIVATE workflow::workflo
 workflow_enable_windows7(workflow_windows_target_contract)
 add_test(NAME workflow.windows-target
         COMMAND $<TARGET_FILE:workflow_windows_target_contract>)
+
+add_test(NAME workflow.browser-fixtures
+        COMMAND ${CMAKE_COMMAND}
+                "-DWORKFLOW_BROWSER_FIXTURE_ROOT=${CMAKE_CURRENT_SOURCE_DIR}/browser/web"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/browser/ValidateFixtures.cmake")

@@ -3,6 +3,7 @@
 
 #include <functional>
 #include <memory>
+#include <stdexcept>
 #include <utility>
 #include <vector>
 
@@ -45,24 +46,99 @@ public:
 
     void _finish(float finishWait, const std::vector<std::unique_ptr<Until>>& finishUntilList);
 
-    [[nodiscard]] std::unique_ptr<ClickerBase> locate();
+    [[nodiscard]] virtual std::unique_ptr<ClickerBase> locate();
 
-    [[nodiscard]] std::unique_ptr<ClickerBase> click(
+    template <typename RunConfig>
+        requires requires(const RunConfig& config) {
+            config.startWait;
+            config.startUntilList;
+            config.runUntilList;
+            config.finishUntilList;
+            config.finishWait;
+            config.homing;
+            RunConfigAdapter<RunConfig>::selector(config);
+        }
+    [[nodiscard]] std::unique_ptr<ClickerBase> locate(
+        RunConfig runConfig
+    ) {
+        return locateResolved(resolveRunConfig(runConfig));
+    }
+
+    [[nodiscard]] virtual std::unique_ptr<ClickerBase> click(
         float interval = 1,
         int offsetX = 0,
         int offsetY = 0,
         Click position = Click::CENTER
     );
 
-    [[nodiscard]] std::unique_ptr<ClickerBase> drag(int step = 10, bool reverse = false);
+    template <typename RunConfig>
+        requires requires(const RunConfig& config) {
+            config.startWait;
+            config.startUntilList;
+            config.runUntilList;
+            config.finishUntilList;
+            config.finishWait;
+            config.homing;
+            RunConfigAdapter<RunConfig>::selector(config);
+        }
+    [[nodiscard]] std::unique_ptr<ClickerBase> click(
+        RunConfig runConfig,
+        const float interval = 1,
+        const int offsetX = 0,
+        const int offsetY = 0,
+        const Click position = Click::CENTER
+    ) {
+        return clickResolved(resolveRunConfig(runConfig), interval, offsetX, offsetY, position);
+    }
 
-    [[nodiscard]] std::unique_ptr<ClickerBase> scroll(
+    [[nodiscard]] virtual std::unique_ptr<ClickerBase> drag(int step = 10, bool reverse = false);
+
+    template <typename RunConfig>
+        requires requires(const RunConfig& config) {
+            config.startWait;
+            config.startUntilList;
+            config.runUntilList;
+            config.finishUntilList;
+            config.finishWait;
+            config.homing;
+            RunConfigAdapter<RunConfig>::selector(config);
+        }
+    [[nodiscard]] std::unique_ptr<ClickerBase> drag(
+        RunConfig runConfig,
+        const int step = 10,
+        const bool reverse = false
+    ) {
+        return dragResolved(resolveRunConfig(runConfig), step, reverse);
+    }
+
+    [[nodiscard]] virtual std::unique_ptr<ClickerBase> scroll(
         int delta = -WheelDelta,
         float interval = 1,
         int offsetX = 0,
         int offsetY = 0,
         Click position = Click::CENTER
     );
+
+    template <typename RunConfig>
+        requires requires(const RunConfig& config) {
+            config.startWait;
+            config.startUntilList;
+            config.runUntilList;
+            config.finishUntilList;
+            config.finishWait;
+            config.homing;
+            RunConfigAdapter<RunConfig>::selector(config);
+        }
+    [[nodiscard]] std::unique_ptr<ClickerBase> scroll(
+        RunConfig runConfig,
+        const int delta = -WheelDelta,
+        const float interval = 1,
+        const int offsetX = 0,
+        const int offsetY = 0,
+        const Click position = Click::CENTER
+    ) {
+        return scrollResolved(resolveRunConfig(runConfig), delta, interval, offsetX, offsetY, position);
+    }
 
     static void end();
 
@@ -118,21 +194,47 @@ protected:
         int offsetY,
         Click position
     );
+
+    template <typename RunConfig>
+    [[nodiscard]] ResolvedRunConfig resolveRunConfig(
+        const RunConfig& runConfig
+    ) const {
+        if (kind != RunConfigAdapter<RunConfig>::kind) {
+            throw std::invalid_argument("RunConfig与Clicker的MatchKind不一致");
+        }
+        return {
+            .startWait = runConfig.startWait,
+            .selector = RunConfigAdapter<RunConfig>::selector(runConfig),
+            .startUntilList = runConfig.startUntilList,
+            .runUntilList = runConfig.runUntilList,
+            .finishUntilList = runConfig.finishUntilList,
+            .finishWait = runConfig.finishWait,
+            .homing = runConfig.homing,
+        };
+    }
 };
 
 template <typename InitConfig, typename RunConfig> class Clicker : public ClickerBase {
 public:
     InitConfig config;
 
-    using ClickerBase::click;
-    using ClickerBase::drag;
-    using ClickerBase::locate;
-    using ClickerBase::scroll;
+    [[nodiscard]] std::unique_ptr<ClickerBase> locate() override {
+        return locateResolved(this->resolveRunConfig(RunConfig{}));
+    }
 
     [[nodiscard]] std::unique_ptr<ClickerBase> locate(
         RunConfig runConfig
     ) {
-        return locateResolved(resolveRunConfig(runConfig));
+        return locateResolved(this->resolveRunConfig(runConfig));
+    }
+
+    [[nodiscard]] std::unique_ptr<ClickerBase> click(
+        const float interval = 1,
+        const int offsetX = 0,
+        const int offsetY = 0,
+        const Click position = Click::CENTER
+    ) override {
+        return clickResolved(this->resolveRunConfig(RunConfig{}), interval, offsetX, offsetY, position);
     }
 
     [[nodiscard]] std::unique_ptr<ClickerBase> click(
@@ -142,7 +244,14 @@ public:
         const int offsetY = 0,
         const Click position = Click::CENTER
     ) {
-        return clickResolved(resolveRunConfig(runConfig), interval, offsetX, offsetY, position);
+        return clickResolved(this->resolveRunConfig(runConfig), interval, offsetX, offsetY, position);
+    }
+
+    [[nodiscard]] std::unique_ptr<ClickerBase> drag(
+        const int step = 10,
+        const bool reverse = false
+    ) override {
+        return dragResolved(this->resolveRunConfig(RunConfig{}), step, reverse);
     }
 
     [[nodiscard]] std::unique_ptr<ClickerBase> drag(
@@ -150,7 +259,17 @@ public:
         const int step = 10,
         const bool reverse = false
     ) {
-        return dragResolved(resolveRunConfig(runConfig), step, reverse);
+        return dragResolved(this->resolveRunConfig(runConfig), step, reverse);
+    }
+
+    [[nodiscard]] std::unique_ptr<ClickerBase> scroll(
+        const int delta = -WheelDelta,
+        const float interval = 1,
+        const int offsetX = 0,
+        const int offsetY = 0,
+        const Click position = Click::CENTER
+    ) override {
+        return scrollResolved(this->resolveRunConfig(RunConfig{}), delta, interval, offsetX, offsetY, position);
     }
 
     [[nodiscard]] std::unique_ptr<ClickerBase> scroll(
@@ -161,7 +280,7 @@ public:
         const int offsetY = 0,
         const Click position = Click::CENTER
     ) {
-        return scrollResolved(resolveRunConfig(runConfig), delta, interval, offsetX, offsetY, position);
+        return scrollResolved(this->resolveRunConfig(runConfig), delta, interval, offsetX, offsetY, position);
     }
 
 protected:
@@ -193,22 +312,7 @@ protected:
     }
 
     [[nodiscard]] ResolvedRunConfig defaultRunConfig() const override {
-        return resolveRunConfig(RunConfig{});
-    }
-
-private:
-    [[nodiscard]] static ResolvedRunConfig resolveRunConfig(
-        const RunConfig& runConfig
-    ) {
-        return {
-            .startWait = runConfig.startWait,
-            .selector = RunConfigAdapter<RunConfig>::selector(runConfig),
-            .startUntilList = runConfig.startUntilList,
-            .runUntilList = runConfig.runUntilList,
-            .finishUntilList = runConfig.finishUntilList,
-            .finishWait = runConfig.finishWait,
-            .homing = runConfig.homing,
-        };
+        return this->resolveRunConfig(RunConfig{});
     }
 };
 

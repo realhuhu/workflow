@@ -27,8 +27,21 @@ if (-not $Dumpbin -or -not (Test-Path -LiteralPath $Dumpbin)) {
     throw "dumpbin.exe was not found: $Dumpbin"
 }
 
-$resolvedBinaries = $Binaries | ForEach-Object {
-    (Resolve-Path -LiteralPath $_).Path
+$resolvedBinaries = @(
+    foreach ($binary in $Binaries) {
+        $resolvedPath = (Resolve-Path -LiteralPath $binary).Path
+        $item = Get-Item -LiteralPath $resolvedPath
+        if ($item.PSIsContainer) {
+            Get-ChildItem -LiteralPath $resolvedPath -Recurse -File |
+                Where-Object { $_.Extension -in '.dll', '.exe' } |
+                ForEach-Object FullName
+        } else {
+            $resolvedPath
+        }
+    }
+) | Sort-Object -Unique
+if (-not $resolvedBinaries) {
+    throw 'No PE binaries were found to audit'
 }
 $providedFileNames = $resolvedBinaries | ForEach-Object {
     [System.IO.Path]::GetFileName($_).ToLowerInvariant()

@@ -36,9 +36,16 @@ New-Item -ItemType Directory -Force -Path $destinationPath, $downloadsPath | Out
 $qtInstallPath = Join-Path $destinationPath 'Qt'
 $qtRoot = Join-Path $qtInstallPath "$qtVersion\msvc2019_64"
 if (-not (Test-Path -LiteralPath (Join-Path $qtRoot 'bin\Qt5Core.dll'))) {
-    & python -m aqt install-qt windows desktop $qtVersion $qtArchitecture -O $qtInstallPath
+    & python -m aqt install-qt windows desktop $qtVersion $qtArchitecture `
+        -m qtwebengine -O $qtInstallPath
     if ($LASTEXITCODE -ne 0) {
         throw "aqtinstall failed with exit code $LASTEXITCODE"
+    }
+} elseif (-not (Test-Path -LiteralPath (Join-Path $qtRoot 'bin\Qt5WebEngineWidgets.dll'))) {
+    & python -m aqt install-qt windows desktop $qtVersion $qtArchitecture `
+        -m qtwebengine -O $qtInstallPath
+    if ($LASTEXITCODE -ne 0) {
+        throw "aqtinstall failed to add Qt WebEngine; exit code $LASTEXITCODE"
     }
 }
 

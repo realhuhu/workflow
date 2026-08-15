@@ -1,8 +1,6 @@
 #ifndef WORKFLOW_CORE_SEGMENT_H
 #define WORKFLOW_CORE_SEGMENT_H
 
-#include <QString>
-
 #include "core/types.h"
 
 class Segment {

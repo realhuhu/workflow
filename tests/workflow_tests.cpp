@@ -41,6 +41,14 @@ namespace {
         clicker.scroll(config);
     };
 
+    template <typename ClickerType>
+    concept AcceptsUnconfiguredActions = requires(ClickerType& clicker) {
+        clicker.locate();
+        clicker.click(0.2f, 1, 2, Click::CENTER);
+        clicker.drag(10, false);
+        clicker.scroll(-WheelDelta, 0.2f, 1, 2, Click::CENTER);
+    };
+
     static_assert(std::is_abstract_v<ClickerBase>);
     static_assert(HasSelector<ImageRunConfig>);
     static_assert(!HasSelector<TextRunConfig>);
@@ -48,6 +56,13 @@ namespace {
     static_assert(!AcceptsRunConfig<ImageClicker, TextRunConfig>);
     static_assert(AcceptsRunConfig<TextClicker, TextRunConfig>);
     static_assert(!AcceptsRunConfig<TextClicker, ImageRunConfig>);
+    static_assert(AcceptsRunConfig<ClickerBase, ImageRunConfig>);
+    static_assert(AcceptsRunConfig<ClickerBase, TextRunConfig>);
+    static_assert(AcceptsUnconfiguredActions<ImageClicker>);
+    static_assert(AcceptsUnconfiguredActions<TextClicker>);
+    static_assert(AcceptsUnconfiguredActions<ClickerBase>);
+    static_assert(std::same_as<decltype(std::declval<ImageClicker&>().click()), std::unique_ptr<ClickerBase>>);
+    static_assert(std::same_as<decltype(std::declval<TextClicker&>().click()), std::unique_ptr<ClickerBase>>);
 
     class Failure final : public std::runtime_error {
     public:
@@ -623,7 +638,6 @@ namespace {
         EXPECT_FALSE(clonedEmptyText->founded());
         EXPECT_EQ(clonedEmptyText->kind, MatchKind::TEXT);
         EXPECT_EQ(clonedEmptyText->target, emptyText.target);
-        EXPECT_TRUE(dynamic_cast<TextClicker*>(clonedEmptyText.get()) != nullptr);
         EXPECT_EQ(window.captures, capturesBeforeClone);
         EXPECT_EQ(provider.calls, 0);
     }
@@ -774,7 +788,6 @@ namespace {
         EXPECT_EQ(platform.captures, 1);
         EXPECT_EQ(next->kind, MatchKind::TEXT);
         EXPECT_EQ(next->target, QStringLiteral("目标"));
-        EXPECT_TRUE(dynamic_cast<TextClicker*>(next.get()) != nullptr);
         EXPECT_EQ(next->targetSegmentList.size(), size_t(1));
         const Segment& hit = next->targetSegmentList.front();
         EXPECT_EQ(hit.x, 10);
@@ -891,7 +904,6 @@ namespace {
         EXPECT_TRUE(static_cast<bool>(terminal));
         EXPECT_EQ(terminal->kind, MatchKind::TEXT);
         EXPECT_EQ(terminal->target, clicker.target);
-        EXPECT_TRUE(dynamic_cast<TextClicker*>(terminal.get()) != nullptr);
         EXPECT_EQ(platform.captures, 0);
         EXPECT_EQ(provider.calls, 0);
         terminal->end();
@@ -941,15 +953,12 @@ namespace {
         EXPECT_TRUE(next->founded());
         EXPECT_EQ(next->kind, MatchKind::TEXT);
         EXPECT_EQ(next->target, QStringLiteral("下一步"));
-        EXPECT_TRUE(dynamic_cast<TextClicker*>(next.get()) != nullptr);
         EXPECT_EQ(next->targetSegmentList.size(), size_t(1));
         EXPECT_EQ(next->targetSegmentList.front().x, 70);
         EXPECT_EQ(next->targetSegmentList.front().y, 40);
         EXPECT_EQ(provider.calls, 2);
 
-        auto* nextText = dynamic_cast<TextClicker*>(next.get());
-        EXPECT_TRUE(nextText != nullptr);
-        auto terminal = nextText->click(TextRunConfig{.homing = false}, 0.0f);
+        auto terminal = next->click(TextRunConfig{.homing = false}, 0.0f);
         EXPECT_TRUE(static_cast<bool>(terminal));
         terminal->end();
 
@@ -1148,7 +1157,6 @@ namespace {
 
         EXPECT_TRUE(static_cast<bool>(next));
         EXPECT_EQ(next->kind, MatchKind::TEXT);
-        EXPECT_TRUE(dynamic_cast<TextClicker*>(next.get()) != nullptr);
         EXPECT_TRUE(next->founded());
         EXPECT_EQ(next->target, QStringLiteral("下一步"));
         EXPECT_EQ(next->targetSegmentList.size(), size_t(1));
@@ -1157,9 +1165,7 @@ namespace {
         EXPECT_EQ(provider.calls, 2);
         EXPECT_TRUE(platform.wheelEvents().empty());
 
-        auto* nextText = dynamic_cast<TextClicker*>(next.get());
-        EXPECT_TRUE(nextText != nullptr);
-        auto terminal = nextText->scroll(TextRunConfig{.homing = false}, 360, 0.0f, 1, -1, Click::DOWN);
+        auto terminal = next->scroll(TextRunConfig{.homing = false}, 360, 0.0f, 1, -1, Click::DOWN);
         EXPECT_TRUE(static_cast<bool>(terminal));
         EXPECT_EQ(terminal->kind, MatchKind::TEXT);
         EXPECT_EQ(terminal->target, QStringLiteral("下一步"));
@@ -1227,13 +1233,11 @@ namespace {
         );
         EXPECT_EQ(textNext->kind, MatchKind::TEXT);
         EXPECT_EQ(textNext->target, QStringLiteral("文字目标"));
-        EXPECT_TRUE(dynamic_cast<TextClicker*>(textNext.get()) != nullptr);
         EXPECT_EQ(textNext->targetSegmentList.front().x, 20);
         EXPECT_EQ(textNext->targetSegmentList.front().y, 15);
+        EXPECT_THROWS(std::invalid_argument, textNext->locate(ImageRunConfig{.homing = false}));
 
-        auto* textClicker = dynamic_cast<TextClicker*>(textNext.get());
-        EXPECT_TRUE(textClicker != nullptr);
-        auto imageNext = textClicker->locate(
+        auto imageNext = textNext->locate(
             TextRunConfig{
                 .finishUntilList = {new Image(imagePath, imageConfig)},
                 .homing = false,
@@ -1241,11 +1245,11 @@ namespace {
         );
         EXPECT_EQ(imageNext->kind, MatchKind::IMAGE);
         EXPECT_EQ(imageNext->target, imagePath);
-        EXPECT_TRUE(dynamic_cast<ImageClicker*>(imageNext.get()) != nullptr);
         EXPECT_TRUE(imageNext->founded());
         EXPECT_EQ(imageNext->targetSegmentList.front().x, 62);
         EXPECT_EQ(imageNext->targetSegmentList.front().y, 43);
         EXPECT_EQ(provider.calls, 1);
+        EXPECT_THROWS(std::invalid_argument, imageNext->locate(TextRunConfig{.homing = false}));
     }
 
     void testUnifiedClickerTextAnyImageAnyTextChain() {
@@ -1289,11 +1293,8 @@ namespace {
         );
         EXPECT_EQ(imageNext->kind, MatchKind::IMAGE);
         EXPECT_EQ(imageNext->target, imagePath);
-        EXPECT_TRUE(dynamic_cast<ImageClicker*>(imageNext.get()) != nullptr);
 
-        auto* imageClicker = dynamic_cast<ImageClicker*>(imageNext.get());
-        EXPECT_TRUE(imageClicker != nullptr);
-        auto textNext = imageClicker->locate(
+        auto textNext = imageNext->locate(
             ImageRunConfig{
                 .finishUntilList = {new AnyText({"missing", "完成"}, textConfig)},
                 .homing = false,
@@ -1301,7 +1302,6 @@ namespace {
         );
         EXPECT_EQ(textNext->kind, MatchKind::TEXT);
         EXPECT_EQ(textNext->target, QStringLiteral("完成"));
-        EXPECT_TRUE(dynamic_cast<TextClicker*>(textNext.get()) != nullptr);
         EXPECT_TRUE(textNext->founded());
         EXPECT_EQ(provider.calls, 1);
     }
@@ -1371,9 +1371,7 @@ namespace {
         provider.calls = 0;
         provider.inputs.clear();
 
-        auto* optionalImageClicker = dynamic_cast<ImageClicker*>(afterOptional.get());
-        EXPECT_TRUE(optionalImageClicker != nullptr);
-        auto next = optionalImageClicker->scroll(
+        auto next = afterOptional->scroll(
             ImageRunConfig{
                 .runUntilList =
                     {
@@ -1398,7 +1396,6 @@ namespace {
         EXPECT_EQ(next->kind, MatchKind::TEXT);
         EXPECT_TRUE(next->founded());
         EXPECT_EQ(next->target, QStringLiteral("alpha"));
-        EXPECT_TRUE(dynamic_cast<TextClicker*>(next.get()) != nullptr);
 
         const auto wheels = platform.wheelEvents();
         EXPECT_EQ(wheels.size(), size_t(4));

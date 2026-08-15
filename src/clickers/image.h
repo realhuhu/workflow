@@ -24,6 +24,7 @@ struct ImageRunConfig {
 };
 
 template <> struct RunConfigAdapter<ImageRunConfig> {
+    static constexpr auto kind = MatchKind::IMAGE;
     [[nodiscard]] static Selector selector(const ImageRunConfig& config);
 };
 

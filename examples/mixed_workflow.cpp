@@ -30,32 +30,25 @@ namespace {
                 .region = QRect(0, 0, 900, 700),
             }
         );
-        auto next = imageClicker->click(
-            ImageRunConfig{
-                .finishUntilList =
-                    {
-                        // AnyText crops before OCR, recognizes the ROI once,
-                        // then checks candidates in input order. Its global
-                        // Segment result is consumed by Clicker::_createNext,
-                        // which creates a concrete TextClicker.
-                        new AnyText(
-                            {"确认", "继续"},
-                            {
-                                .mode = Mode::RGB,
-                                .threshold = 0.80f,
-                                .reverse = false,
-                                .match = TextMatch::EXACT,
-                                .boxThreshold = 0.50f,
-                                .region = QRect(250, 180, 500, 360),
-                            }
-                        ),
-                    },
-            }
-        );
-
-        auto* textClicker = dynamic_cast<TextClicker*>(next.get());
-        if (!textClicker) throw std::runtime_error("下一节点不是TextClicker");
-        textClicker
+        imageClicker
+            ->click(
+                ImageRunConfig{
+                    .finishUntilList =
+                        {
+                            new AnyText(
+                                {"确认", "继续"},
+                                {
+                                    .mode = Mode::RGB,
+                                    .threshold = 0.80f,
+                                    .reverse = false,
+                                    .match = TextMatch::EXACT,
+                                    .boxThreshold = 0.50f,
+                                    .region = QRect(250, 180, 500, 360),
+                                }
+                            ),
+                        },
+                }
+            )
             ->click(
                 TextRunConfig{
                     .runUntilList =

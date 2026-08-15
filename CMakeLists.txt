@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(workflow VERSION 0.1.0 LANGUAGES CXX)
+project(workflow VERSION 0.1.1 LANGUAGES CXX)
 
 if (NOT WIN32)
     message(FATAL_ERROR "workflow currently supports Windows only")
@@ -25,6 +25,9 @@ endif()
 
 option(WORKFLOW_BUILD_EXAMPLES "Build workflow examples" ${_workflow_developer_default})
 option(WORKFLOW_BUILD_TESTS "Build workflow tests" ${_workflow_developer_default})
+option(WORKFLOW_BUILD_BROWSER_HARNESS
+        "Build the Qt WebEngine visual automation harness"
+        ${_workflow_developer_default})
 option(WORKFLOW_INSTALL "Generate install and CMake package rules" ${PROJECT_IS_TOP_LEVEL})
 set(WORKFLOW_CLANG_FORMAT_EXECUTABLE "$ENV{CLANG_FORMAT}" CACHE FILEPATH
         "clang-format 22 or newer executable")
@@ -248,9 +251,9 @@ function(workflow_enable_windows7 target)
         else()
             set(_workflow_subsystem CONSOLE)
         endif()
+        target_sources(${target} PRIVATE "${WORKFLOW_WINDOWS_MANIFEST}")
         target_link_options(${target} PRIVATE
-                "/SUBSYSTEM:${_workflow_subsystem},6.01"
-                "/MANIFESTINPUT:${WORKFLOW_WINDOWS_MANIFEST}")
+                "/SUBSYSTEM:${_workflow_subsystem},6.01")
     endif()
 endfunction()
 
@@ -293,6 +296,9 @@ function(workflow_stage_runtime target)
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                     "${_workflow_source_dir}/licenses/BOOST-1.0.txt"
                     "${_runtime_dir}/licenses/Boost-1.0.txt"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${_workflow_source_dir}/licenses/Qt-LGPL-GPL-3.0.txt"
+                    "${_runtime_dir}/licenses/Qt-LGPL-GPL-3.0.txt"
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                     "${WORKFLOW_ONNXRUNTIME_ROOT}/LICENSE"
                     "${_runtime_dir}/licenses/ONNXRuntime-MIT.txt"
@@ -355,6 +361,11 @@ if (WORKFLOW_BUILD_TESTS)
     add_subdirectory(tests)
 endif()
 
+if (WORKFLOW_BUILD_BROWSER_HARNESS)
+    find_package(Qt5 5.15.2 EXACT REQUIRED COMPONENTS Gui Widgets WebEngineWidgets)
+    add_subdirectory(tests/browser)
+endif()
+
 if (WORKFLOW_INSTALL)
     set(_workflow_package_cmake_dir "${CMAKE_INSTALL_LIBDIR}/cmake/workflow")
     set(_workflow_package_data_dir "${CMAKE_INSTALL_DATADIR}/workflow")
@@ -389,6 +400,8 @@ if (WORKFLOW_INSTALL)
     install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/licenses/BOOST-1.0.txt"
             DESTINATION "${_workflow_package_data_dir}/licenses"
             RENAME Boost-1.0.txt)
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/licenses/Qt-LGPL-GPL-3.0.txt"
+            DESTINATION "${_workflow_package_data_dir}/licenses")
     install(FILES "${WORKFLOW_ONNXRUNTIME_ROOT}/LICENSE"
             DESTINATION "${_workflow_package_data_dir}/licenses"
             RENAME ONNXRuntime-MIT.txt)

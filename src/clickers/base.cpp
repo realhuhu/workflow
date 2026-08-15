@@ -395,7 +395,7 @@ std::unique_ptr<ClickerBase> ClickerBase::_createNext(
     switch (condition->kind) {
         case MatchKind::IMAGE: {
             const auto* imageUntil = dynamic_cast<const ImageUntil*>(condition);
-            if (!imageUntil) throw std::logic_error("IMAGE条件类型与MatchKind不一致");
+            if (!imageUntil) throw std::logic_error("IMAGE条件不是ImageUntil实例");
             return std::make_unique<ImageClicker>(
                 condition->target,
                 imageUntil->targetSegmentList,
@@ -410,7 +410,7 @@ std::unique_ptr<ClickerBase> ClickerBase::_createNext(
         }
         case MatchKind::TEXT: {
             const auto* textUntil = dynamic_cast<const TextUntil*>(condition);
-            if (!textUntil) throw std::logic_error("TEXT条件类型与MatchKind不一致");
+            if (!textUntil) throw std::logic_error("TEXT条件不是TextUntil实例");
             return std::make_unique<TextClicker>(
                 condition->target,
                 textUntil->targetSegmentList,

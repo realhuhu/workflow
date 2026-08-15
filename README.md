@@ -199,21 +199,21 @@ auto next = imageClicker.click(
 `ImageRunConfig` 额外提供 `selector`，默认 `similaritySelector`。`TextRunConfig` 没有 selector，文字目标
 固定使用首个匹配结果。
 
-动作返回 `std::unique_ptr<ClickerBase>`，因为最后一个 run/finish 条件可能改变下一节点类别。需要继续使用
-带类型的 RunConfig 时，先检查 `kind` 并转换为具体 Clicker：
+动作返回 `std::unique_ptr<ClickerBase>`，因为最后一个 run/finish 条件可能改变下一节点类别。
+`ClickerBase` 直接接受两种 RunConfig，因此跨图片/文字节点仍可保持原有链式写法，不需要类型转换：
 
 ```cpp
-auto next = imageClicker.click(ImageRunConfig{
-    .finishUntilList = {new Text("确认")},
-});
-
-if (next->kind != MatchKind::TEXT) throw std::runtime_error("期望文字节点");
-auto* text = dynamic_cast<TextClicker*>(next.get());
-if (!text) throw std::runtime_error("文字节点类型不一致");
-
-auto terminal = text->click(TextRunConfig{.homing = false});
-terminal->end();
+imageClicker
+    .click(ImageRunConfig{
+        .finishUntilList = {new Text("确认")},
+    })
+    ->click(TextRunConfig{.homing = false})
+    ->end();
 ```
+
+直接操作 `ImageClicker` 或 `TextClicker` 时，编译器仍只接受各自的 RunConfig；进入运行时传播后的
+`ClickerBase` 同时提供两个配置重载，以保留 Conqueror 的连续动作 API，并在执行前校验配置与当前
+`MatchKind` 一致。
 
 ## 执行生命周期和链传播
 
@@ -373,41 +373,38 @@ auto image = std::make_unique<ImageClicker>(
     ImageInitConfig{.threshold = 0.92f, .timeout = 30}
 );
 
-auto next = image->click(ImageRunConfig{
-    .finishUntilList = {
-        new AnyText(
-            {"确认", "继续"},
-            TextUntilConfig{
-                .match = TextMatch::EXACT,
-                .region = QRect(250, 180, 500, 360),
-            }
-        ),
-    },
-    .homing = false,
-});
-
-auto* text = dynamic_cast<TextClicker*>(next.get());
-if (!text) throw std::runtime_error("下一节点不是TextClicker");
-
-auto terminal = text->scroll(
-    TextRunConfig{
-        .runUntilList = {
-            new Text(
-                "完成",
+image
+    ->click(ImageRunConfig{
+        .finishUntilList = {
+            new AnyText(
+                {"确认", "继续"},
                 TextUntilConfig{
-                    .onPrevious = Previous::DOWN,
                     .match = TextMatch::EXACT,
-                    .cropToPrevious = true,
-                    .cropPadding = QMargins(0, 8, 0, 8),
+                    .region = QRect(250, 180, 500, 360),
                 }
             ),
         },
         .homing = false,
-    },
-    -WheelDelta,
-    0.2f
-);
-terminal->end();
+    })
+    ->scroll(
+        TextRunConfig{
+            .runUntilList = {
+                new Text(
+                    "完成",
+                    TextUntilConfig{
+                        .onPrevious = Previous::DOWN,
+                        .match = TextMatch::EXACT,
+                        .cropToPrevious = true,
+                        .cropPadding = QMargins(0, 8, 0, 8),
+                    }
+                ),
+            },
+            .homing = false,
+        },
+        -WheelDelta,
+        0.2f
+    )
+    ->end();
 ```
 
 完整环境初始化和命令行 HWND 解析见 [examples/mixed_workflow.cpp](examples/mixed_workflow.cpp)。
@@ -525,9 +522,12 @@ cmake -S . -B build `
 1. 下载并校验固定版本依赖；
 2. clang-format 22 检查；
 3. Release 构建和 CTest；
-4. Windows 7 PE/import 审计；
+4. SDK 与 Browser UI 全部运行文件的 Windows 7 PE/import 审计；
 5. 安装 SDK并构建独立消费项目；
-6. 上传 `workflow-<version>-windows-x64-win7sp1.zip`。
+6. 上传 SDK `workflow-<version>-windows-x64-win7sp1.zip`；
+7. 上传可直接运行的 Browser UI 示例
+   `workflow-browser-ui-<version>-windows-x64-win7sp1.zip`，其中包含示例 EXE、20 个测试页面、OCR 模型、
+   Qt WebEngine、OpenCV 和 ONNX Runtime。
 
 推送 `v*` 标签时还会构建 Debug 库，并通过 GitHub CLI 创建对应 Release。标签应与
 `project(workflow VERSION ...)` 保持一致。

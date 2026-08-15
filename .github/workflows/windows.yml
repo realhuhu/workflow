@@ -37,7 +37,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ runner.temp }}\workflow-dependencies
-          key: workflow-windows-x64-qt-5.15.2-opencv-4.10.0-ort-1.13.1-v1
+          key: workflow-windows-x64-qt-5.15.2-webengine-opencv-4.10.0-ort-1.13.1-v2
 
       - name: Install native dependencies
         shell: pwsh
@@ -61,11 +61,41 @@ jobs:
 
       - name: Audit Windows 7 imports
         shell: pwsh
-        run: cmake --build build/windows-v142 --config Release --target workflow_win7_audit
+        run: >-
+          cmake --build build/windows-v142 --config Release
+          --target workflow_win7_audit workflow_browser_win7_audit
 
       - name: Install SDK
         shell: pwsh
         run: cmake --install build/windows-v142 --config Release --prefix stage
+
+      - name: Install Browser UI example
+        shell: pwsh
+        run: >-
+          cmake --install build/windows-v142 --config Release
+          --prefix browser-stage --component Browser
+
+      - name: Verify Browser UI package
+        shell: pwsh
+        run: |
+          $requiredFiles = @(
+            'workflow-browser-harness.exe',
+            'README.md',
+            'browser-test/index.html',
+            'models/det.onnx',
+            'models/rec.onnx',
+            'Qt5WebEngineCore.dll',
+            'Qt5WebEngineWidgets.dll',
+            'QtWebEngineProcess.exe',
+            'resources/icudtl.dat',
+            'licenses/Qt-LGPL-GPL-3.0.txt'
+          )
+          foreach ($relativePath in $requiredFiles) {
+            $path = Join-Path "$pwd/browser-stage" $relativePath
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+              throw "Browser UI package is missing $relativePath"
+            }
+          }
 
       - name: Verify installed package consumer
         shell: pwsh
@@ -101,9 +131,18 @@ jobs:
           $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash.ToLowerInvariant()
           "$hash  $([System.IO.Path]::GetFileName($archive))" |
             Out-File -FilePath $checksum -Encoding ascii
+          $browserArchive = "$pwd/dist/workflow-browser-ui-$version-windows-x64-win7sp1.zip"
+          Compress-Archive -Path "$pwd/browser-stage/*" -DestinationPath $browserArchive -CompressionLevel Optimal
+          $browserChecksum = "$browserArchive.sha256"
+          $browserHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $browserArchive).Hash.ToLowerInvariant()
+          "$browserHash  $([System.IO.Path]::GetFileName($browserArchive))" |
+            Out-File -FilePath $browserChecksum -Encoding ascii
           "archive=$archive" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           "checksum=$checksum" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           "name=workflow-$version-windows-x64-win7sp1" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "browser_archive=$browserArchive" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "browser_checksum=$browserChecksum" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "browser_name=workflow-browser-ui-$version-windows-x64-win7sp1" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       - name: Upload SDK artifact
         uses: actions/upload-artifact@v7
@@ -112,6 +151,15 @@ jobs:
           path: |
             ${{ steps.package.outputs.archive }}
             ${{ steps.package.outputs.checksum }}
+          if-no-files-found: error
+
+      - name: Upload Browser UI artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.package.outputs.browser_name }}
+          path: |
+            ${{ steps.package.outputs.browser_archive }}
+            ${{ steps.package.outputs.browser_checksum }}
           if-no-files-found: error
 
       - name: Publish GitHub release
@@ -125,10 +173,14 @@ jobs:
             gh release upload $env:GITHUB_REF_NAME `
               "${{ steps.package.outputs.archive }}" `
               "${{ steps.package.outputs.checksum }}" `
+              "${{ steps.package.outputs.browser_archive }}" `
+              "${{ steps.package.outputs.browser_checksum }}" `
               --clobber
           } else {
             gh release create $env:GITHUB_REF_NAME `
               "${{ steps.package.outputs.archive }}" `
               "${{ steps.package.outputs.checksum }}" `
+              "${{ steps.package.outputs.browser_archive }}" `
+              "${{ steps.package.outputs.browser_checksum }}" `
               --generate-notes --verify-tag
           }

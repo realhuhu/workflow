@@ -27,6 +27,7 @@ struct TextRunConfig {
 };
 
 template <> struct RunConfigAdapter<TextRunConfig> {
+    static constexpr auto kind = MatchKind::TEXT;
     [[nodiscard]] static Selector selector(const TextRunConfig& config);
 };
 
