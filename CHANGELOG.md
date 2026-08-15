@@ -4,6 +4,13 @@
 
 ## Unreleased
 
+## 0.1.2
+
+- Browser UI Release 拆分为 Windows 7 SP1 兼容版和 Windows 10+ 精简版。
+- 兼容版应用本地部署完整 MSVC v142 CRT、UCRT 与五个 API Set 转发 DLL，修复缺少
+  `MSVCP140.dll`、`api-ms-win-core-shlwapi-legacy-l1-1-0.dll` 等启动错误。
+- CI 分别校验并发布两个 Browser 包；精简版不再携带编译器运行库和 Win7 兼容层。
+
 ## 0.1.1
 
 - 保留 `run/finish → _createNext` 链传播，并允许 `ClickerBase` 直接使用图片或文字 RunConfig，混合链不再需要 `dynamic_cast`。

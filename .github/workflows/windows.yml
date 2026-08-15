@@ -88,6 +88,11 @@ jobs:
             'Qt5WebEngineWidgets.dll',
             'QtWebEngineProcess.exe',
             'resources/icudtl.dat',
+            'api-ms-win-core-libraryloader-l1-2-0.dll',
+            'api-ms-win-core-processtopology-obsolete-l1-1-0.dll',
+            'api-ms-win-eventing-provider-l1-1-0.dll',
+            'api-ms-win-core-heap-l2-1-0.dll',
+            'api-ms-win-core-shlwapi-legacy-l1-1-0.dll',
             'licenses/Qt-LGPL-GPL-3.0.txt'
           )
           foreach ($relativePath in $requiredFiles) {
@@ -114,7 +119,7 @@ jobs:
           cmake --build --preset windows-debug
           cmake --install build/windows-v142 --config Debug --prefix stage
 
-      - name: Create SDK archive
+      - name: Create release archives
         id: package
         shell: pwsh
         run: |
@@ -131,18 +136,19 @@ jobs:
           $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash.ToLowerInvariant()
           "$hash  $([System.IO.Path]::GetFileName($archive))" |
             Out-File -FilePath $checksum -Encoding ascii
-          $browserArchive = "$pwd/dist/workflow-browser-ui-$version-windows-x64-win7sp1.zip"
-          Compress-Archive -Path "$pwd/browser-stage/*" -DestinationPath $browserArchive -CompressionLevel Optimal
-          $browserChecksum = "$browserArchive.sha256"
-          $browserHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $browserArchive).Hash.ToLowerInvariant()
-          "$browserHash  $([System.IO.Path]::GetFileName($browserArchive))" |
-            Out-File -FilePath $browserChecksum -Encoding ascii
+          $browserPackages = ./scripts/Package-Browser.ps1 `
+            -SourceDirectory "$pwd/browser-stage" `
+            -DestinationDirectory "$pwd/dist" `
+            -Version $version
           "archive=$archive" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           "checksum=$checksum" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           "name=workflow-$version-windows-x64-win7sp1" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          "browser_archive=$browserArchive" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          "browser_checksum=$browserChecksum" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          "browser_name=workflow-browser-ui-$version-windows-x64-win7sp1" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "browser_slim_archive=$($browserPackages.SlimArchive)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "browser_slim_checksum=$($browserPackages.SlimChecksum)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "browser_slim_name=workflow-browser-ui-$version-windows-x64-slim" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "browser_compatible_archive=$($browserPackages.CompatibleArchive)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "browser_compatible_checksum=$($browserPackages.CompatibleChecksum)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "browser_compatible_name=workflow-browser-ui-$version-windows-x64-win7-compatible" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       - name: Upload SDK artifact
         uses: actions/upload-artifact@v7
@@ -153,13 +159,22 @@ jobs:
             ${{ steps.package.outputs.checksum }}
           if-no-files-found: error
 
-      - name: Upload Browser UI artifact
+      - name: Upload slim Browser UI artifact
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ steps.package.outputs.browser_name }}
+          name: ${{ steps.package.outputs.browser_slim_name }}
           path: |
-            ${{ steps.package.outputs.browser_archive }}
-            ${{ steps.package.outputs.browser_checksum }}
+            ${{ steps.package.outputs.browser_slim_archive }}
+            ${{ steps.package.outputs.browser_slim_checksum }}
+          if-no-files-found: error
+
+      - name: Upload Windows 7 compatible Browser UI artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.package.outputs.browser_compatible_name }}
+          path: |
+            ${{ steps.package.outputs.browser_compatible_archive }}
+            ${{ steps.package.outputs.browser_compatible_checksum }}
           if-no-files-found: error
 
       - name: Publish GitHub release
@@ -173,14 +188,18 @@ jobs:
             gh release upload $env:GITHUB_REF_NAME `
               "${{ steps.package.outputs.archive }}" `
               "${{ steps.package.outputs.checksum }}" `
-              "${{ steps.package.outputs.browser_archive }}" `
-              "${{ steps.package.outputs.browser_checksum }}" `
+              "${{ steps.package.outputs.browser_slim_archive }}" `
+              "${{ steps.package.outputs.browser_slim_checksum }}" `
+              "${{ steps.package.outputs.browser_compatible_archive }}" `
+              "${{ steps.package.outputs.browser_compatible_checksum }}" `
               --clobber
           } else {
             gh release create $env:GITHUB_REF_NAME `
               "${{ steps.package.outputs.archive }}" `
               "${{ steps.package.outputs.checksum }}" `
-              "${{ steps.package.outputs.browser_archive }}" `
-              "${{ steps.package.outputs.browser_checksum }}" `
+              "${{ steps.package.outputs.browser_slim_archive }}" `
+              "${{ steps.package.outputs.browser_slim_checksum }}" `
+              "${{ steps.package.outputs.browser_compatible_archive }}" `
+              "${{ steps.package.outputs.browser_compatible_checksum }}" `
               --generate-notes --verify-tag
           }

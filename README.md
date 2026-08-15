@@ -22,8 +22,8 @@ OCR 运行时需要 `det.onnx`、`cls.onnx`、`rec.onnx` 和 `keys.txt`，默认
 
 ONNX Runtime 固定为 1.13.1 是 Windows 7 兼容约束。官方 1.20.1 Windows 二进制会直接导入
 `CreateFile2` 和 `GetSystemTimePreciseAsFileTime` 等 Windows 8+ API，不能用于 Windows 7 发布包。
-1.13.1 仍使用三个 Windows 7 不提供的 API-set 合同名；项目从源码构建三个只转发到 Windows 7
-既有 `Kernel32`/`Advapi32` 函数的兼容 DLL，并由运行时部署函数放到应用目录，不修改系统目录。
+1.13.1 仍使用五个 Windows 7 不提供的 API-set 合同名；项目从源码构建五个只转发到 Windows 7
+既有 `Kernel32`/`Advapi32`/`Shlwapi` 函数的兼容 DLL，并由运行时部署函数放到应用目录，不修改系统目录。
 
 ## 源码结构
 
@@ -485,7 +485,7 @@ scroll 时序以及真实 Win32 wheel 消息边界。
 cmake --install build --config Release --prefix stage
 ```
 
-安装树包含公开头文件、`workflow.lib`、`workflow_rapidocr.lib`、ONNX Runtime import/runtime、三个
+安装树包含公开头文件、`workflow.lib`、`workflow_rapidocr.lib`、ONNX Runtime import/runtime、五个
 Win7 API-set 转发 DLL、OCR
 模型、许可证以及 `workflowConfig.cmake`。Qt 和 OpenCV 开发包不会被重复打包；消费项目必须提供完全
 一致的 Qt 5.15.2 和 OpenCV 4.10.0。
@@ -525,9 +525,11 @@ cmake -S . -B build `
 4. SDK 与 Browser UI 全部运行文件的 Windows 7 PE/import 审计；
 5. 安装 SDK并构建独立消费项目；
 6. 上传 SDK `workflow-<version>-windows-x64-win7sp1.zip`；
-7. 上传可直接运行的 Browser UI 示例
-   `workflow-browser-ui-<version>-windows-x64-win7sp1.zip`，其中包含示例 EXE、20 个测试页面、OCR 模型、
-   Qt WebEngine、OpenCV 和 ONNX Runtime。
+7. 上传两个可直接运行的 Browser UI 示例：
+   - `workflow-browser-ui-<version>-windows-x64-win7-compatible.zip`：Windows 7 SP1 兼容版，额外包含
+     MSVC v142 CRT、应用本地 UCRT 和五个 API Set 转发 DLL；
+   - `workflow-browser-ui-<version>-windows-x64-slim.zip`：Windows 10+ 精简版，仅包含应用、Qt、
+     OpenCV、ONNX Runtime、OCR 模型和网页资源，要求系统已安装 Microsoft Visual C++ x64 运行库。
 
 推送 `v*` 标签时还会构建 Debug 库，并通过 GitHub CLI 创建对应 Release。标签应与
 `project(workflow VERSION ...)` 保持一致。

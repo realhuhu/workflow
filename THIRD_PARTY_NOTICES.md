@@ -5,6 +5,7 @@ MIT 许可证只覆盖本仓库原创代码和文档，不替代下列组件自�
 | 组件 | 本项目使用范围 | 许可证/说明 |
 | --- | --- | --- |
 | Qt 5.15.2 | Core、Gui、Widgets、WebEngine 及其运行依赖 | 可采用 LGPLv3、GPL 或商业许可；本项目使用可替换的动态链接，许可证全文见 `licenses/Qt-LGPL-GPL-3.0.txt` |
+| Microsoft Visual C++ v142 CRT / Universal CRT | Browser UI 的应用本地 Windows 运行库 | 按 Visual Studio 2019 可再发行代码条款随二进制包分发 |
 | OpenCV 4.10.0 | 截图矩阵、图像处理、图像编码 | Apache License 2.0 |
 | ONNX Runtime 1.13.1 | OCR 模型推理；固定该版本以支持 Windows 7 SP1 | MIT License；官方发行包还附带 `ThirdPartyNotices.txt` |
 | RapidAI/RapidOCR | OCR 检测、方向、识别模型与实现 | Apache License 2.0；本项目内置 C++/ONNX Runtime 封装所需源码和模型 |

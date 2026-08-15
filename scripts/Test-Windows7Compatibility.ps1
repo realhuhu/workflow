@@ -49,7 +49,9 @@ $providedFileNames = $resolvedBinaries | ForEach-Object {
 $requiredApiSetShims = @(
     'api-ms-win-core-libraryloader-l1-2-0.dll',
     'api-ms-win-core-processtopology-obsolete-l1-1-0.dll',
-    'api-ms-win-eventing-provider-l1-1-0.dll'
+    'api-ms-win-eventing-provider-l1-1-0.dll',
+    'api-ms-win-core-heap-l2-1-0.dll',
+    'api-ms-win-core-shlwapi-legacy-l1-1-0.dll'
 )
 $expectedShimExports = @{
     'api-ms-win-core-libraryloader-l1-2-0.dll' = @(
@@ -68,6 +70,14 @@ $expectedShimExports = @{
         'EventWriteTransfer',
         'EventUnregister',
         'EventRegister'
+    )
+    'api-ms-win-core-heap-l2-1-0.dll' = @(
+        'LocalFree'
+    )
+    'api-ms-win-core-shlwapi-legacy-l1-1-0.dll' = @(
+        'PathSkipRootW',
+        'PathFindNextComponentW',
+        'PathRemoveBackslashW'
     )
 }
 

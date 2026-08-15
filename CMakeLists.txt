@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(workflow VERSION 0.1.1 LANGUAGES CXX)
+project(workflow VERSION 0.1.2 LANGUAGES CXX)
 
 if (NOT WIN32)
     message(FATAL_ERROR "workflow currently supports Windows only")
@@ -119,7 +119,9 @@ add_subdirectory(src/third_party/rapidocr)
 set(_workflow_win7_shim_targets
         workflow_win7_libraryloader
         workflow_win7_processtopology
-        workflow_win7_eventing)
+        workflow_win7_eventing
+        workflow_win7_heap
+        workflow_win7_shlwapi)
 add_library(workflow_win7_libraryloader SHARED
         src/platform/win7/forwarder.cpp
         src/platform/win7/libraryloader.def)
@@ -129,6 +131,12 @@ add_library(workflow_win7_processtopology SHARED
 add_library(workflow_win7_eventing SHARED
         src/platform/win7/forwarder.cpp
         src/platform/win7/eventing.def)
+add_library(workflow_win7_heap SHARED
+        src/platform/win7/forwarder.cpp
+        src/platform/win7/heap.def)
+add_library(workflow_win7_shlwapi SHARED
+        src/platform/win7/forwarder.cpp
+        src/platform/win7/shlwapi.def)
 set_target_properties(workflow_win7_libraryloader PROPERTIES
         AUTOMOC OFF
         PREFIX ""
@@ -141,6 +149,16 @@ set_target_properties(workflow_win7_eventing PROPERTIES
         AUTOMOC OFF
         PREFIX ""
         OUTPUT_NAME "api-ms-win-eventing-provider-l1-1-0")
+set_target_properties(workflow_win7_heap PROPERTIES
+        AUTOMOC OFF
+        PREFIX ""
+        OUTPUT_NAME "api-ms-win-core-heap-l2-1-0")
+set_target_properties(workflow_win7_shlwapi PROPERTIES
+        AUTOMOC OFF
+        PREFIX ""
+        OUTPUT_NAME "api-ms-win-core-shlwapi-legacy-l1-1-0")
+target_link_libraries(workflow_win7_heap PRIVATE kernel32)
+target_link_libraries(workflow_win7_shlwapi PRIVATE shlwapi)
 foreach (_shim_target IN LISTS _workflow_win7_shim_targets)
     target_link_options(${_shim_target} PRIVATE
             /NOENTRY
@@ -281,6 +299,10 @@ function(workflow_stage_runtime target)
                     "$<TARGET_FILE:workflow_win7_processtopology>" "${_runtime_dir}"
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                     "$<TARGET_FILE:workflow_win7_eventing>" "${_runtime_dir}"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "$<TARGET_FILE:workflow_win7_heap>" "${_runtime_dir}"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "$<TARGET_FILE:workflow_win7_shlwapi>" "${_runtime_dir}"
             COMMAND ${CMAKE_COMMAND} -E copy_directory
                     "${WORKFLOW_MODELS_DIR}" "${_runtime_dir}/models"
             COMMAND ${CMAKE_COMMAND} -E make_directory "${_runtime_dir}/licenses"
@@ -350,6 +372,8 @@ if (WORKFLOW_BUILD_EXAMPLES)
                         "$<TARGET_FILE:workflow_win7_libraryloader>"
                         "$<TARGET_FILE:workflow_win7_processtopology>"
                         "$<TARGET_FILE:workflow_win7_eventing>"
+                        "$<TARGET_FILE:workflow_win7_heap>"
+                        "$<TARGET_FILE:workflow_win7_shlwapi>"
                 DEPENDS mixed_workflow_example
                 COMMENT "Auditing PE subsystem versions and post-Windows-7 imports"
                 VERBATIM)

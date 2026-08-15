@@ -1,0 +1,5 @@
+LIBRARY api-ms-win-core-shlwapi-legacy-l1-1-0
+EXPORTS
+    PathSkipRootW=SHLWAPI.PathSkipRootW
+    PathFindNextComponentW=SHLWAPI.PathFindNextComponentW
+    PathRemoveBackslashW=SHLWAPI.PathRemoveBackslashW

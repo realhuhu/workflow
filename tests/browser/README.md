@@ -22,9 +22,14 @@ cmake --build build/windows-v142 --config Release --target workflow_browser_harn
 - 首次启动时生成四张无抗锯齿的 48 × 48 PNG 模板到
   `browser-test/游戏图片/fixtures/`，网页和 OpenCV 使用同一份文件。
 
-GitHub Release 中的 `workflow-browser-ui-<version>-windows-x64-win7sp1.zip` 已包含上述运行文件，解压后
-直接启动 `workflow-browser-harness.exe`。Windows 7 仍需安装 KB2999226 和 Microsoft Visual C++
-2015–2019 x64 Redistributable。Qt 采用动态链接，Qt LGPL/GPL 许可证全文位于 `licenses/`。
+GitHub Release 提供两个 Browser UI 运行包，解压后均可直接启动 `workflow-browser-harness.exe`：
+
+- `workflow-browser-ui-<version>-windows-x64-win7-compatible.zip`：Windows 7 SP1 兼容版，包含 MSVC
+  v142 CRT、应用本地 UCRT 和 API Set 转发 DLL，不要求另行安装 Visual C++ Redistributable；
+- `workflow-browser-ui-<version>-windows-x64-slim.zip`：Windows 10+ 精简版，只携带应用、Qt、OpenCV、
+  ONNX Runtime、OCR 模型与网页资源，要求系统已安装 Microsoft Visual C++ 2015–2022 x64 运行库。
+
+Windows 7 SP1 仍建议安装完整系统更新。Qt 采用动态链接，Qt LGPL/GPL 许可证全文位于 `licenses/`。
 
 ## DPI 与缩放约束
 

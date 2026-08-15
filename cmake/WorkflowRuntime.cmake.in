@@ -37,6 +37,12 @@ function(workflow_stage_runtime target)
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                     "${WORKFLOW_RUNTIME_DIRECTORY}/api-ms-win-eventing-provider-l1-1-0.dll"
                     "${_runtime_dir}"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${WORKFLOW_RUNTIME_DIRECTORY}/api-ms-win-core-heap-l2-1-0.dll"
+                    "${_runtime_dir}"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${WORKFLOW_RUNTIME_DIRECTORY}/api-ms-win-core-shlwapi-legacy-l1-1-0.dll"
+                    "${_runtime_dir}"
             COMMAND ${CMAKE_COMMAND} -E copy_directory
                     "${WORKFLOW_MODELS_DIRECTORY}"
                     "${_runtime_dir}/models"

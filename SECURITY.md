@@ -10,8 +10,8 @@
 Windows 7 已结束微软安全支持。本项目对 Windows 7 SP1 x64 的承诺是 ABI、PE subsystem 和
 Win32 API 兼容，不代表该操作系统或旧版第三方运行时仍可获得上游安全修复。
 
-Windows 7 部署必须完整安装系统更新、KB2999226 Universal C Runtime 和匹配的 v142
-Redistributable。三个 API-set 转发 DLL 只应与应用一起放在可执行文件目录，禁止复制到
-`System32` 或替换系统文件。
+Windows 7 部署必须使用 SP1 并完整安装系统更新。`win7-compatible` Browser 包已经应用本地部署
+v142 CRT 与 UCRT；SDK 或自行构建的程序仍需安装 KB2999226 和匹配的 v142 Redistributable。
+五个 API-set 转发 DLL 只应与应用一起放在可执行文件目录，禁止复制到 `System32` 或替换系统文件。
 
 处理不可信窗口、图片或 OCR 输入时，优先在仍受支持的 Windows 版本、低权限账户和隔离环境中运行。
