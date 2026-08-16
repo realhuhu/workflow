@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "name": "11 延迟出现文字",
+  "clicker": {
+    "kind": "IMAGE",
+    "target": "fixtures/marker-b.png",
+    "config": {
+      "threshold": 0.98,
+      "timeout": 12,
+      "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+    }
+  },
+  "steps": [
+    {
+      "action": "click",
+      "runConfig": {
+        "startUntilList": [
+          {
+            "type": "Text",
+            "target": "READY",
+            "config": {
+              "threshold": 0.25,
+              "interval": 0.12,
+              "timeout": 8,
+              "boxThreshold": 0.25,
+              "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+            }
+          }
+        ],
+        "finishUntilList": [
+          {
+            "type": "Text",
+            "target": "DELAY PASS",
+            "config": {
+              "threshold": 0.25,
+              "interval": 0.12,
+              "timeout": 8,
+              "boxThreshold": 0.25,
+              "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+            }
+          }
+        ],
+        "homing": false
+      },
+      "interval": 0.1
+    }
+  ]
+}

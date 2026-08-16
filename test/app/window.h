@@ -6,9 +6,12 @@
 #include <atomic>
 #include <memory>
 
+#include "cases.h"
+
 class Emitter;
 class OcrEngine;
 class QCloseEvent;
+class QComboBox;
 class QLabel;
 class QListWidget;
 class QPushButton;
@@ -35,7 +38,9 @@ private:
     QLabel* caseDetails{};
     QLabel* environmentStatus{};
     QLabel* runStatus{};
+    QComboBox* workflowSource{};
     QPushButton* runButton{};
+    QPushButton* runAllButton{};
     QPushButton* resetButton{};
     QPushButton* stopButton{};
     QPushButton* indexButton{};
@@ -50,6 +55,11 @@ private:
     int currentCaseId = 0;
     bool pageReady = false;
     bool ocrReady = false;
+    bool batchRunning = false;
+    bool batchWaitingForPage = false;
+    int batchRunIndex = 0;
+    int batchPassed = 0;
+    int batchFailed = 0;
 
     void buildInterface();
     void configureBrowser();
@@ -61,8 +71,13 @@ private:
     void verifyPageEnvironment();
     void resetCurrentCase();
     void runCurrentCase();
-    void startCaseWorker(int id);
-    void finishCaseWorker(int id, bool success, const QString& message);
+    void runAllCases();
+    void runNextBatchCase();
+    void runBatchCurrentCase();
+    void completeBatchCase(bool success, const QString& message);
+    void finishBatch(bool stopped);
+    void startCaseWorker(int id, TestWorkflowSource source);
+    void finishCaseWorker(int id, TestWorkflowSource source, bool success, const QString& message);
     void stopCurrentCase();
     void setRunState(const QString& state, const QString& text);
     void updateControls();

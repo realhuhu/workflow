@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "name": "18 滚轮滚动",
+  "clicker": {
+    "kind": "IMAGE",
+    "target": "fixtures/marker-a.png",
+    "config": {
+      "threshold": 0.98,
+      "timeout": 12,
+      "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+    }
+  },
+  "steps": [
+    {
+      "action": "scroll",
+      "runConfig": {
+        "runUntilList": [
+          {
+            "type": "Text",
+            "target": "SCROLL COMPLETE",
+            "config": {
+              "threshold": 0.25,
+              "interval": 0.12,
+              "timeout": 8,
+              "boxThreshold": 0.25,
+              "region": {"x": 170, "y": 180, "width": 660, "height": 530}
+            }
+          }
+        ],
+        "homing": false
+      },
+      "delta": -480,
+      "interval": 0.5
+    }
+  ]
+}

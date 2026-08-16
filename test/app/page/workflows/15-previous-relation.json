@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "name": "15 Previous 空间关系",
+  "clicker": {
+    "kind": "IMAGE",
+    "target": "fixtures/marker-a.png",
+    "config": {
+      "threshold": 0.98,
+      "timeout": 12,
+      "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+    }
+  },
+  "steps": [
+    {
+      "action": "locate",
+      "runConfig": {
+        "finishUntilList": [
+          {
+            "type": "Text",
+            "target": "RIGHT TARGET",
+            "config": {
+              "onPrevious": "RIGHT_CENTER",
+              "threshold": 0.25,
+              "interval": 0.12,
+              "timeout": 8,
+              "boxThreshold": 0.25,
+              "region": {"x": 20, "y": 120, "width": 960, "height": 660},
+              "cropPadding": {"left": 0, "top": 18, "right": 0, "bottom": 18}
+            }
+          }
+        ],
+        "homing": false
+      }
+    },
+    {
+      "action": "click",
+      "runConfig": {
+        "finishUntilList": [
+          {
+            "type": "Text",
+            "target": "RELATION PASS",
+            "config": {
+              "threshold": 0.25,
+              "interval": 0.12,
+              "timeout": 8,
+              "boxThreshold": 0.25,
+              "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+            }
+          }
+        ],
+        "homing": false
+      },
+      "interval": 0.1
+    }
+  ]
+}

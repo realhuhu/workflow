@@ -9,6 +9,7 @@
 
 #include <QApplication>
 #include <QCloseEvent>
+#include <QComboBox>
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QDir>
@@ -23,6 +24,7 @@
 #include <QSignalBlocker>
 #include <QStyleFactory>
 #include <QTextEdit>
+#include <QTextOption>
 #include <QThread>
 #include <QTimer>
 #include <QUrl>
@@ -56,6 +58,12 @@ namespace {
             if (definition.id == id) return &definition;
         }
         return nullptr;
+    }
+
+    QString workflowSourceName(
+        const TestWorkflowSource source
+    ) {
+        return source == TestWorkflowSource::CPP ? QStringLiteral("C++") : QStringLiteral("JSON");
     }
 
     QString mappedColor(
@@ -163,6 +171,7 @@ TestWindow::TestWindow(
     if (!QFileInfo::exists(QDir(webRoot).filePath(QStringLiteral("index.html")))) {
         throw std::runtime_error("测试页面未部署到: " + webRoot.toStdString());
     }
+    validateJsonTestCases(QDir(webRoot).filePath(QStringLiteral("workflows")));
     prepareFixtureImages();
     buildInterface();
     configureBrowser();
@@ -230,6 +239,17 @@ void TestWindow::buildInterface() {
     environmentRow->addWidget(runStatus);
     panelLayout->addLayout(environmentRow);
 
+    auto* sourceRow = new QHBoxLayout();
+    auto* sourceLabel = new QLabel(QStringLiteral("流程来源"), panel);
+    sourceLabel->setObjectName(QStringLiteral("sourceLabel"));
+    workflowSource = new QComboBox(panel);
+    workflowSource->setObjectName(QStringLiteral("workflowSource"));
+    workflowSource->addItem(QStringLiteral("C++ 链式 API"), static_cast<int>(TestWorkflowSource::CPP));
+    workflowSource->addItem(QStringLiteral("JSON 工作流"), static_cast<int>(TestWorkflowSource::JSON));
+    sourceRow->addWidget(sourceLabel);
+    sourceRow->addWidget(workflowSource, 1);
+    panelLayout->addLayout(sourceRow);
+
     caseList = new QListWidget(panel);
     caseList->setObjectName(QStringLiteral("caseList"));
     caseList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -245,7 +265,7 @@ void TestWindow::buildInterface() {
 
     caseTitle = new QLabel(QStringLiteral("选择一个测试用例"), panel);
     caseTitle->setObjectName(QStringLiteral("caseTitle"));
-    caseDetails = new QLabel(QStringLiteral("左侧索引包含 20 个独立二级页面。"), panel);
+    caseDetails = new QLabel(QStringLiteral("左侧索引包含 28 个独立二级页面。"), panel);
     caseDetails->setObjectName(QStringLiteral("caseDetails"));
     caseDetails->setWordWrap(true);
     panelLayout->addWidget(caseTitle);
@@ -260,6 +280,11 @@ void TestWindow::buildInterface() {
     primaryButtons->addWidget(resetButton);
     panelLayout->addLayout(primaryButtons);
 
+    runAllButton =
+        new QPushButton(QStringLiteral("运行全部 %1 项").arg(static_cast<int>(testCases().size() * 2)), panel);
+    runAllButton->setObjectName(QStringLiteral("runAllButton"));
+    panelLayout->addWidget(runAllButton);
+
     auto* secondaryButtons = new QHBoxLayout();
     stopButton = new QPushButton(QStringLiteral("停止"), panel);
     stopButton->setObjectName(QStringLiteral("dangerButton"));
@@ -273,6 +298,9 @@ void TestWindow::buildInterface() {
     output->setObjectName(QStringLiteral("output"));
     output->setReadOnly(true);
     output->setAcceptRichText(true);
+    output->setLineWrapMode(QTextEdit::WidgetWidth);
+    output->setWordWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
+    output->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     panelLayout->addWidget(output, 3);
 
     rootLayout->addWidget(panel);
@@ -296,11 +324,17 @@ void TestWindow::buildInterface() {
         #caseList::item:hover:!selected { background: #18232a; color: #f7f3e8; }
         #caseTitle { color: #f7f3e8; font: 700 15px "Microsoft YaHei UI"; }
         #caseDetails { color: #8fa2aa; font: 12px "Microsoft YaHei UI"; }
+        #sourceLabel { color: #8fa2aa; font: 12px "Microsoft YaHei UI"; }
+        #workflowSource { min-height: 30px; padding: 0 8px; border: 1px solid #35434b; border-radius: 3px; background: #0b1117; color: #f7f3e8; font: 12px "Microsoft YaHei UI"; }
+        #workflowSource:disabled { color: #53626a; border-color: #263138; }
+        #workflowSource QAbstractItemView { background: #0b1117; color: #dbe2e5; selection-background-color: #f2c94c; selection-color: #111820; }
         QPushButton { min-height: 34px; padding: 0 12px; border: 1px solid #35434b; border-radius: 3px; background: #18232a; color: #dbe2e5; font: 700 12px "Microsoft YaHei UI"; }
         QPushButton:hover:enabled { border-color: #f2c94c; color: #f2c94c; }
         QPushButton:disabled { color: #53626a; border-color: #263138; background: #141c21; }
         #runButton { background: #f2c94c; color: #111820; border-color: #f2c94c; }
         #runButton:hover:enabled { background: #ffe17a; color: #111820; }
+        #runAllButton { color: #27d7e6; border-color: #27d7e6; }
+        #runAllButton:hover:enabled { background: #17343b; color: #7bedf5; border-color: #7bedf5; }
         #dangerButton:hover:enabled { color: #ff6b6b; border-color: #ff6b6b; }
         #output { background: #0a0f14; color: #bac4c9; border: 1px solid #29333a; padding: 6px; font: 11px "Consolas"; }
         QScrollBar:vertical { width: 9px; background: #0b1117; }
@@ -309,12 +343,13 @@ void TestWindow::buildInterface() {
     )"));
 
     connect(caseList, &QListWidget::itemSelectionChanged, this, [this] {
-        if (worker) return;
+        if (worker || batchRunning) return;
         const QList<QListWidgetItem*> selected = caseList->selectedItems();
         if (selected.isEmpty()) return;
         loadCase(selected.front()->data(Qt::UserRole).toInt());
     });
     connect(runButton, &QPushButton::clicked, this, &TestWindow::runCurrentCase);
+    connect(runAllButton, &QPushButton::clicked, this, &TestWindow::runAllCases);
     connect(resetButton, &QPushButton::clicked, this, &TestWindow::resetCurrentCase);
     connect(stopButton, &QPushButton::clicked, this, &TestWindow::stopCurrentCase);
     connect(indexButton, &QPushButton::clicked, this, &TestWindow::loadIndex);
@@ -325,6 +360,10 @@ void TestWindow::buildInterface() {
         else {
             environmentStatus->setText(QStringLiteral("页面加载失败"));
             setRunState(QStringLiteral("fail"), QStringLiteral("LOAD FAIL"));
+            if (batchRunning && batchWaitingForPage) {
+                batchWaitingForPage = false;
+                QTimer::singleShot(0, this, [this] { completeBatchCase(false, QStringLiteral("页面加载失败")); });
+            }
         }
         updateControls();
     });
@@ -372,7 +411,7 @@ void TestWindow::loadIndex() {
         caseList->clearSelection();
         caseList->setCurrentRow(-1);
     }
-    caseTitle->setText(QStringLiteral("20 个确定性测试页面"));
+    caseTitle->setText(QStringLiteral("28 个确定性测试页面"));
     caseDetails->setText(QStringLiteral("从索引或右侧列表选择用例；网页区域固定为 1000 × 800 CSS px。"));
     setRunState(QStringLiteral("ready"), QStringLiteral("INDEX"));
     browser->load(QUrl::fromLocalFile(QDir(webRoot).filePath(QStringLiteral("index.html"))));
@@ -441,39 +480,185 @@ void TestWindow::verifyPageEnvironment() {
             }
             pageReady = pageReady && valid;
             updateControls();
+            if (!batchRunning || !batchWaitingForPage) return;
+            batchWaitingForPage = false;
+            if (valid) {
+                QTimer::singleShot(0, this, &TestWindow::runBatchCurrentCase);
+            } else {
+                QTimer::singleShot(0, this, [this] {
+                    completeBatchCase(false, QStringLiteral("DPI 或页面缩放校准失败"));
+                });
+            }
         }
     );
 }
 
 void TestWindow::resetCurrentCase() {
-    if (!pageReady || currentCaseId == 0 || worker) return;
+    if (!pageReady || currentCaseId == 0 || worker || batchRunning) return;
     browser->page()->runJavaScript(QStringLiteral("window.workflowFixture.reset()"));
     setRunState(QStringLiteral("ready"), QStringLiteral("READY"));
     appendLog(QStringLiteral("用例 %1 已重置").arg(currentCaseId), QStringLiteral("blue"));
 }
 
 void TestWindow::runCurrentCase() {
-    if (!pageReady || currentCaseId == 0 || worker) return;
+    if (!pageReady || currentCaseId == 0 || worker || batchRunning) return;
     if (!ocrReady && currentCaseId >= 9) {
         QMessageBox::critical(this, QStringLiteral("OCR 不可用"), QStringLiteral("文字用例需要成功初始化 RapidOCR。"));
         return;
     }
 
     const int id = currentCaseId;
+    const auto source = static_cast<TestWorkflowSource>(workflowSource->currentData().toInt());
     stopFlag.store(false);
     setRunState(QStringLiteral("running"), QStringLiteral("RUNNING"));
-    appendLog(QStringLiteral("—— 运行用例 %1 ——").arg(id, 2, 10, QLatin1Char('0')), QStringLiteral("orange"));
+    appendLog(
+        QStringLiteral("—— 运行用例 %1 · %2 ——").arg(id, 2, 10, QLatin1Char('0')).arg(workflowSourceName(source)),
+        QStringLiteral("orange")
+    );
     updateControls();
 
-    browser->page()->runJavaScript(QStringLiteral("window.workflowFixture.reset()"), [this, id](const QVariant&) {
-        QTimer::singleShot(80, this, [this, id] {
-            if (currentCaseId == id && !worker) startCaseWorker(id);
-        });
-    });
+    browser->page()->runJavaScript(
+        QStringLiteral("window.workflowFixture.reset()"),
+        [this, id, source](const QVariant&) {
+            QTimer::singleShot(80, this, [this, id, source] {
+                if (currentCaseId == id && !worker) startCaseWorker(id, source);
+            });
+        }
+    );
+}
+
+void TestWindow::runAllCases() {
+    if (worker || batchRunning) return;
+    if (!ocrReady) {
+        QMessageBox::critical(this, QStringLiteral("OCR 不可用"), QStringLiteral("批量运行需要成功初始化 RapidOCR。"));
+        return;
+    }
+
+    batchRunning = true;
+    batchWaitingForPage = false;
+    batchRunIndex = 0;
+    batchPassed = 0;
+    batchFailed = 0;
+    stopFlag.store(false);
+    appendLog(
+        QStringLiteral("════ 开始批量运行 %1 项：%2 个用例 × C++/JSON ════")
+            .arg(static_cast<int>(testCases().size() * 2))
+            .arg(static_cast<int>(testCases().size())),
+        QStringLiteral("orange")
+    );
+    updateControls();
+    runNextBatchCase();
+}
+
+void TestWindow::runNextBatchCase() {
+    if (!batchRunning) return;
+    if (stopFlag.load()) return finishBatch(true);
+
+    const int total = static_cast<int>(testCases().size() * 2);
+    if (batchRunIndex >= total) return finishBatch(false);
+
+    const TestCase& definition = testCases().at(static_cast<size_t>(batchRunIndex / 2));
+    const TestWorkflowSource source = batchRunIndex % 2 == 0 ? TestWorkflowSource::CPP : TestWorkflowSource::JSON;
+    const int sourceIndex = workflowSource->findData(static_cast<int>(source));
+    if (sourceIndex >= 0) workflowSource->setCurrentIndex(sourceIndex);
+
+    batchWaitingForPage = true;
+    loadCase(definition.id);
+    setRunState(QStringLiteral("running"), QStringLiteral("%1/%2").arg(batchRunIndex + 1).arg(total));
+    updateControls();
+}
+
+void TestWindow::runBatchCurrentCase() {
+    if (!batchRunning || stopFlag.load()) {
+        if (batchRunning) finishBatch(true);
+        return;
+    }
+
+    const int runIndex = batchRunIndex;
+    const TestCase& definition = testCases().at(static_cast<size_t>(runIndex / 2));
+    const TestWorkflowSource source = runIndex % 2 == 0 ? TestWorkflowSource::CPP : TestWorkflowSource::JSON;
+    const int total = static_cast<int>(testCases().size() * 2);
+    appendLog(
+        QStringLiteral("—— [%1/%2] 用例 %3 · %4 ——")
+            .arg(runIndex + 1)
+            .arg(total)
+            .arg(definition.id, 2, 10, QLatin1Char('0'))
+            .arg(workflowSourceName(source)),
+        QStringLiteral("orange")
+    );
+    setRunState(QStringLiteral("running"), QStringLiteral("%1/%2").arg(runIndex + 1).arg(total));
+    updateControls();
+
+    browser->page()->runJavaScript(
+        QStringLiteral("window.workflowFixture.reset()"),
+        [this, runIndex, id = definition.id, source](const QVariant&) {
+            QTimer::singleShot(80, this, [this, runIndex, id, source] {
+                if (!batchRunning || batchRunIndex != runIndex || currentCaseId != id || worker) return;
+                startCaseWorker(id, source);
+            });
+        }
+    );
+}
+
+void TestWindow::completeBatchCase(
+    const bool success,
+    const QString& message
+) {
+    if (!batchRunning) return;
+
+    const int total = static_cast<int>(testCases().size() * 2);
+    const TestCase& definition = testCases().at(static_cast<size_t>(batchRunIndex / 2));
+    const TestWorkflowSource source = batchRunIndex % 2 == 0 ? TestWorkflowSource::CPP : TestWorkflowSource::JSON;
+    if (success) ++batchPassed;
+    else ++batchFailed;
+    appendLog(
+        QStringLiteral("[%1/%2] %3 · %4：%5 — %6")
+            .arg(batchRunIndex + 1)
+            .arg(total)
+            .arg(definition.id, 2, 10, QLatin1Char('0'))
+            .arg(workflowSourceName(source), success ? QStringLiteral("PASS") : QStringLiteral("FAIL"), message),
+        success ? QStringLiteral("green") : QStringLiteral("red")
+    );
+
+    ++batchRunIndex;
+    QTimer::singleShot(120, this, &TestWindow::runNextBatchCase);
+}
+
+void TestWindow::finishBatch(
+    const bool stopped
+) {
+    const int total = static_cast<int>(testCases().size() * 2);
+    const int completed = batchPassed + batchFailed;
+    batchRunning = false;
+    batchWaitingForPage = false;
+
+    if (stopped) {
+        setRunState(QStringLiteral("fail"), QStringLiteral("STOPPED"));
+        appendLog(
+            QStringLiteral("════ 批量运行已停止：完成 %1/%2，通过 %3，失败 %4 ════")
+                .arg(completed)
+                .arg(total)
+                .arg(batchPassed)
+                .arg(batchFailed),
+            QStringLiteral("orange")
+        );
+    } else {
+        const bool success = batchFailed == 0;
+        setRunState(
+            success ? QStringLiteral("pass") : QStringLiteral("fail"),
+            success ? QStringLiteral("ALL PASS") : QStringLiteral("HAS FAIL")
+        );
+        appendLog(
+            QStringLiteral("════ 批量运行完成：通过 %1/%2，失败 %3 ════").arg(batchPassed).arg(total).arg(batchFailed),
+            success ? QStringLiteral("green") : QStringLiteral("red")
+        );
+    }
+    updateControls();
 }
 
 void TestWindow::startCaseWorker(
-    const int id
+    const int id,
+    const TestWorkflowSource source
 ) {
     Env execution;
     execution.hwnd = reinterpret_cast<HWND>(browser->winId());
@@ -484,12 +669,18 @@ void TestWindow::startCaseWorker(
     execution.resourceRoot = webRoot;
 
     auto outcome = std::make_shared<RunOutcome>();
-    QThread* thread = QThread::create([execution, id, outcome] {
+    const QString workflowRoot = QDir(webRoot).filePath(QStringLiteral("workflows"));
+    QThread* thread = QThread::create([execution, id, source, workflowRoot, outcome] {
         env = execution;
         try {
-            runTestCase(id);
+            runTestCase(id, source, workflowRoot);
             outcome->success = !execution.stopFlag->load();
-            outcome->message = outcome->success ? QStringLiteral("工作流执行完成") : QStringLiteral("用户已停止");
+            if (outcome->success) {
+                outcome->message = source == TestWorkflowSource::CPP ? QStringLiteral("C++ 工作流执行完成")
+                                                                     : QStringLiteral("JSON 工作流执行完成");
+            } else {
+                outcome->message = QStringLiteral("用户已停止");
+            }
         } catch (const std::exception& exception) {
             outcome->message = QString::fromUtf8(exception.what());
         } catch (...) {
@@ -497,9 +688,9 @@ void TestWindow::startCaseWorker(
         }
     });
     worker = thread;
-    connect(thread, &QThread::finished, this, [this, thread, id, outcome] {
+    connect(thread, &QThread::finished, this, [this, thread, id, source, outcome] {
         if (worker == thread) worker = nullptr;
-        finishCaseWorker(id, outcome->success, outcome->message);
+        finishCaseWorker(id, source, outcome->success, outcome->message);
         thread->deleteLater();
         updateControls();
     });
@@ -509,20 +700,38 @@ void TestWindow::startCaseWorker(
 
 void TestWindow::finishCaseWorker(
     const int id,
+    const TestWorkflowSource source,
     const bool success,
     const QString& message
 ) {
     if (!success) {
+        if (batchRunning) {
+            if (stopFlag.load()) finishBatch(true);
+            else completeBatchCase(false, message);
+            return;
+        }
         setRunState(QStringLiteral("fail"), stopFlag.load() ? QStringLiteral("STOPPED") : QStringLiteral("FAILED"));
         appendLog(message, stopFlag.load() ? QStringLiteral("orange") : QStringLiteral("red"));
         return;
     }
 
+    const bool batchResult = batchRunning;
+    const int expectedBatchRunIndex = batchRunIndex;
     browser->page()->runJavaScript(
         QStringLiteral("document.body.dataset.result || 'pending'"),
-        [this, id, message](const QVariant& value) {
+        [this, id, source, message, batchResult, expectedBatchRunIndex](const QVariant& value) {
             const QString result = value.toString();
-            if (currentCaseId == id && result == QStringLiteral("pass")) {
+            const bool passed = currentCaseId == id && result == QStringLiteral("pass");
+            if (batchResult) {
+                if (!batchRunning || batchRunIndex != expectedBatchRunIndex) return;
+                completeBatchCase(
+                    passed,
+                    passed ? workflowSourceName(source) + QStringLiteral(" 工作流执行完成，页面结果 PASS")
+                           : workflowSourceName(source) + QStringLiteral(" 工作流执行完成，但页面结果为 ") + result
+                );
+                return;
+            }
+            if (passed) {
                 setRunState(QStringLiteral("pass"), QStringLiteral("PASS"));
                 appendLog(message + QStringLiteral("，页面结果 PASS"), QStringLiteral("green"));
             } else {
@@ -534,10 +743,14 @@ void TestWindow::finishCaseWorker(
 }
 
 void TestWindow::stopCurrentCase() {
-    if (!worker) return;
+    if (!worker && !batchRunning) return;
     stopFlag.store(true);
     setRunState(QStringLiteral("running"), QStringLiteral("STOPPING"));
-    appendLog(QStringLiteral("已请求停止当前工作流"), QStringLiteral("orange"));
+    appendLog(
+        batchRunning ? QStringLiteral("已请求停止批量运行") : QStringLiteral("已请求停止当前工作流"),
+        QStringLiteral("orange")
+    );
+    if (batchRunning && !worker) return finishBatch(true);
     updateControls();
 }
 
@@ -553,11 +766,14 @@ void TestWindow::setRunState(
 
 void TestWindow::updateControls() {
     const bool running = worker != nullptr;
-    runButton->setEnabled(pageReady && currentCaseId > 0 && !running);
-    resetButton->setEnabled(pageReady && currentCaseId > 0 && !running);
-    stopButton->setEnabled(running && !stopFlag.load());
-    indexButton->setEnabled(!running);
-    caseList->setEnabled(!running);
+    const bool busy = running || batchRunning;
+    runButton->setEnabled(pageReady && currentCaseId > 0 && !busy);
+    runAllButton->setEnabled(!busy && ocrReady);
+    resetButton->setEnabled(pageReady && currentCaseId > 0 && !busy);
+    stopButton->setEnabled(busy && !stopFlag.load());
+    indexButton->setEnabled(!busy);
+    caseList->setEnabled(!busy);
+    workflowSource->setEnabled(!busy);
 }
 
 void TestWindow::appendLog(
@@ -568,7 +784,7 @@ void TestWindow::appendLog(
     previousLog = text;
     const QString time = QDateTime::currentDateTime().toString(QStringLiteral("hh:mm:ss"));
     output->append(QStringLiteral(
-        "<div style=\"white-space:nowrap;\">"
+        "<div style=\"white-space:normal;\">"
         "<span style=\"color:#091017;background-color:#70e1a1;font-family:Consolas;\">"
         "&nbsp;%1&nbsp;</span>&nbsp;"
         "<span style=\"color:%2;\">%3</span>"

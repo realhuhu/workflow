@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "name": "28 执行阶段等待与归位",
+  "clicker": {
+    "kind": "IMAGE",
+    "target": "fixtures/marker-a.png",
+    "config": {
+      "threshold": 0.98,
+      "timeout": 12,
+      "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+    }
+  },
+  "steps": [
+    {
+      "action": "click",
+      "runConfig": {
+        "startWait": 0.6,
+        "finishUntilList": [
+          {
+            "type": "Image",
+            "target": "fixtures/marker-b.png",
+            "config": {
+              "threshold": 0.98,
+              "interval": 0.12,
+              "timeout": 8,
+              "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+            }
+          }
+        ],
+        "finishWait": 0.6,
+        "homing": true
+      },
+      "interval": 0.1
+    },
+    {
+      "action": "click",
+      "runConfig": {
+        "finishUntilList": [
+          {
+            "type": "Image",
+            "target": "fixtures/marker-c.png",
+            "config": {
+              "threshold": 0.98,
+              "interval": 0.12,
+              "timeout": 8,
+              "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+            }
+          }
+        ],
+        "homing": false
+      },
+      "interval": 0.1
+    }
+  ]
+}

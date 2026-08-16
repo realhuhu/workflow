@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "name": "22 文字匹配模式链",
+  "clicker": {
+    "kind": "IMAGE",
+    "target": "fixtures/marker-a.png",
+    "config": {
+      "threshold": 0.98,
+      "timeout": 12,
+      "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+    }
+  },
+  "steps": [
+    {
+      "action": "click",
+      "runConfig": {
+        "finishUntilList": [
+          {
+            "type": "Text",
+            "target": "ORDER-[0-9]{4}",
+            "config": {
+              "threshold": 0.25,
+              "interval": 0.12,
+              "timeout": 8,
+              "match": "REGEX",
+              "boxThreshold": 0.25,
+              "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+            }
+          }
+        ],
+        "homing": false
+      },
+      "interval": 0.1
+    },
+    {
+      "action": "click",
+      "runConfig": {
+        "finishUntilList": [
+          {
+            "type": "Text",
+            "target": "CONFIRN",
+            "config": {
+              "threshold": 0.25,
+              "interval": 0.12,
+              "timeout": 8,
+              "match": "FUZZY",
+              "boxThreshold": 0.25,
+              "maxEditDistance": 1,
+              "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+            }
+          }
+        ],
+        "homing": false
+      },
+      "interval": 0.1
+    },
+    {
+      "action": "click",
+      "runConfig": {
+        "finishUntilList": [
+          {
+            "type": "Text",
+            "target": "MATCH MODES PASS",
+            "config": {
+              "threshold": 0.25,
+              "interval": 0.12,
+              "timeout": 8,
+              "match": "EXACT",
+              "boxThreshold": 0.25,
+              "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+            }
+          }
+        ],
+        "homing": false
+      },
+      "interval": 0.1
+    }
+  ]
+}

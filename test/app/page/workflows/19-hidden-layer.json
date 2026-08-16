@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "name": "19 遮挡层消失",
+  "clicker": {
+    "kind": "IMAGE",
+    "target": "fixtures/marker-b.png",
+    "config": {
+      "threshold": 0.98,
+      "timeout": 12,
+      "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+    }
+  },
+  "steps": [
+    {
+      "action": "locate",
+      "runConfig": {
+        "finishUntilList": [
+          {
+            "type": "Image",
+            "target": "fixtures/marker-a.png",
+            "config": {
+              "threshold": 0.98,
+              "interval": 0.12,
+              "timeout": 8,
+              "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+            }
+          }
+        ],
+        "homing": false
+      }
+    },
+    {
+      "action": "click",
+      "runConfig": {
+        "finishUntilList": [
+          {
+            "type": "Image",
+            "target": "fixtures/marker-c.png",
+            "config": {
+              "threshold": 0.98,
+              "interval": 0.12,
+              "timeout": 8,
+              "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+            }
+          }
+        ],
+        "homing": false
+      },
+      "interval": 0.1
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "name": "25 反向纵向拖动",
+  "clicker": {
+    "kind": "IMAGE",
+    "target": "fixtures/marker-a.png",
+    "config": {
+      "threshold": 0.98,
+      "timeout": 12,
+      "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+    }
+  },
+  "steps": [
+    {
+      "action": "drag",
+      "runConfig": {
+        "runUntilList": [
+          {
+            "type": "Text",
+            "target": "REVERSE DRAG COMPLETE",
+            "config": {
+              "threshold": 0.25,
+              "interval": 0.12,
+              "timeout": 8,
+              "boxThreshold": 0.25,
+              "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+            }
+          }
+        ],
+        "homing": false
+      },
+      "step": 120,
+      "reverse": true
+    }
+  ]
+}

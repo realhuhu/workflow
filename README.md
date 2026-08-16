@@ -39,6 +39,8 @@ src/
 │   ├── base.h/.cpp            # Until 轮询、反转、超时、Previous 过滤
 │   ├── image.h/.cpp           # 图片 Until 家族
 │   └── text.h/.cpp            # 文字 Until 家族与 OCR ROI 解析
+├── flow/
+│   └── workflow.h/.cpp        # JSON 线性工作流解析与执行
 ├── matching/
 │   ├── image.h/.cpp           # 截图门面、模板匹配、ROI、NMS
 │   ├── text.h/.cpp            # token 文字匹配和编辑距离
@@ -47,8 +49,7 @@ src/
 ├── support/                   # OCR、日志、资源路径、停止与计时
 └── third_party/rapidocr/       # RapidOCR 第三方实现
 
-example/                       # 可运行示例
-test/                          # 单元测试、消费验证、20 页可视化测试程序
+test/                          # 单元测试、消费验证、28 页可视化测试程序
 cmake/                         # CMake 安装、运行时部署、格式化和 Windows manifest
 tool/                          # CI 依赖安装、打包与 Windows 7 PE 导入审计
 .github/workflows/             # Windows 构建、测试、制品和标签发布
@@ -233,6 +234,86 @@ imageClicker
 停止标记置位后不再发送新的输入，流程返回当前节点的克隆。同步 `PrintWindow` 调用本身无法被停止标记或
 框架超时中断；目标窗口线程挂起时，截图仍可能阻塞。
 
+## JSON 线性工作流
+
+`parseWorkflow()` 将 JSON 一次性解析并校验为可重复运行的 `Workflow` 对象。`Workflow::run()` 在运行时
+创建首个 Clicker，依次调用现有 `locate/click/drag/scroll` API，并把每个动作返回的 Clicker 作为下一步
+输入；最终返回完整链条的最后一个 `std::unique_ptr<ClickerBase>`。
+
+```cpp
+const Workflow workflow = parseWorkflowFile("login.json");
+std::unique_ptr<ClickerBase> last = workflow.run();
+```
+
+也可以使用 `parseWorkflow(const QByteArray&)` 或 `parseWorkflow(const QJsonObject&)`。解析结果只保存配置，
+每次 `run()` 都会重新创建 Clicker 和 Until，因此同一个 Workflow 可以重复执行。
+
+```json
+{
+  "version": 1,
+  "name": "图片文字混合链",
+  "clicker": {
+    "kind": "IMAGE",
+    "target": "login/start.png",
+    "config": {
+      "threshold": 0.92,
+      "mode": "GRAY"
+    }
+  },
+  "steps": [
+    {
+      "action": "locate",
+      "runConfig": {
+        "finishUntilList": [
+          {
+            "type": "Text",
+            "target": "确认",
+            "config": {
+              "match": "EXACT",
+              "region": {"x": 250, "y": 180, "width": 500, "height": 360}
+            }
+          }
+        ],
+        "homing": false
+      }
+    },
+    {
+      "action": "click",
+      "runConfig": {
+        "finishUntilList": [
+          {
+            "type": "Image",
+            "target": "login/finished.png",
+            "config": {"threshold": 0.95}
+          }
+        ]
+      },
+      "interval": 0.2,
+      "offsetX": 0,
+      "offsetY": 0,
+      "position": "CENTER"
+    }
+  ]
+}
+```
+
+当前 JSON v1 严格对应已经存在的线性 API：
+
+- Clicker `kind` 为 `IMAGE` 或 `TEXT`，配置分别对应 `ImageInitConfig`、`TextInitConfig`。
+- action 为 `locate`、`click`、`drag` 或 `scroll`，参数与同名 C++ 方法一致。
+- `runConfig` 字段名与 `ImageRunConfig`/`TextRunConfig` 一致。
+- Until `type` 为 `Image/AnyImage/ImageStable/IfImage/IfAnyImage` 或对应的五种 Text 类型。
+- `AnyImage` 和 `AnyText` 使用 `targets`，其他 Until 使用 `target`。
+- `selector` 只允许出现在图片步骤中，支持 `similarity`、`random`、`position` 和 `orderedRandom`。
+- 解析器按照 `_createNext()` 规则静态推导每一步的 MatchKind；错误的 Text selector、非法枚举以及
+  `locate.runUntilList` 会在执行前抛出 `std::invalid_argument`。
+
+v1 暂不解析分支和循环。复杂流程可以继续保留在 C++，后续控制节点建立在这个线性执行对象之上。
+
+`workflow-test` 的右侧面板可在 C++ 链式 API 和 JSON 工作流之间切换；28 个可视化用例
+均提供等价 JSON，用于对比两种执行入口。“运行全部 56 项”会自动逐页执行两种来源，失败项被记录
+后继续运行，并在最后输出汇总。
+
 ## Until 条件
 
 | 图片条件 | 文字条件 | 作用 |
@@ -407,8 +488,6 @@ image
     ->end();
 ```
 
-完整环境初始化和命令行 HWND 解析见 [example/mixed.cpp](example/mixed.cpp)。
-
 ## Windows 7 兼容范围
 
 支持目标是 **Windows 7 SP1 x64 及以上**，不支持 Windows 7 RTM。Windows 7 机器需要：
@@ -463,13 +542,13 @@ cmake --build build/project --config Release --parallel
 ctest --test-dir build/project -C Release --output-on-failure
 ```
 
-项目作为顶层工程时默认构建静态库、`workflow_example` 和测试；通过 `add_subdirectory` 引入时，
-示例和测试默认关闭。只构建库：
+项目作为顶层工程时默认构建静态库、单元测试和 Browser 测试程序；通过
+`add_subdirectory` 引入时，测试默认关闭。只构建库：
 
 ```powershell
 cmake -S . -B build/project `
-  -DWORKFLOW_BUILD_EXAMPLES=OFF `
-  -DWORKFLOW_BUILD_TESTS=OFF
+  -DWORKFLOW_BUILD_TESTS=OFF `
+  -DWORKFLOW_BUILD_TEST_APP=OFF
 cmake --build build/project --parallel
 ```
 

@@ -1,8 +1,13 @@
 # Workflow 可视化测试程序
 
 这是一个完全离线的 Qt WebEngine 可视化测试应用。左侧是固定为 `1000 × 800` 的网页客户区，右侧是
-20 个测试用例、运行控制和框架日志。点击“运行当前用例”后，应用会在工作线程中创建真实的
-`ImageClicker` / `TextClicker`，并把左侧 `QWebEngineView::winId()` 作为目标 HWND。
+28 个测试用例、运行控制和支持自动换行的框架日志。“流程来源”可以在 `C++ 链式 API` 和 `JSON 工作流`
+之间切换；两种模式共用同一页面、参数和结果断言。点击“运行当前用例”后，应用会在工作线程中创建
+真实的 `ImageClicker` / `TextClicker`，并把左侧 `QWebEngineView::winId()` 作为目标 HWND。
+
+“运行全部 56 项”会按用例编号依次执行每个页面的 C++ 和 JSON 版本。每一项都会重新加载页面、
+校验 DPI、重置 fixture 并独立记录 PASS/FAIL；单项失败不会中断后续项目，结束后日志给出通过、失败
+和总数。批量运行期间“停止”会终止当前工作流并取消剩余项目。
 
 ## 构建和运行
 
@@ -16,7 +21,7 @@ cmake --build build/project --config Release --target workflow_test
 
 构建后会自动：
 
-- 把 `page/` 复制到可执行文件旁的 `test-page/`；
+- 把 `page/` 复制到可执行文件旁的 `test-page/`，其中 `workflows/` 保存 28 份 JSON 流程；
 - 使用 `workflow_stage_runtime()` 部署 OCR 模型、OpenCV、ONNX Runtime 和许可证；
 - 使用 `windeployqt` 部署 Qt WebEngine 进程、资源和 DLL；
 - 首次启动时生成四张无抗锯齿的 48 × 48 PNG 模板到
@@ -45,7 +50,7 @@ Windows 7 SP1 仍建议安装完整系统更新。Qt 采用动态链接，Qt LGP
 目标模板全部使用整数坐标、原生尺寸 PNG 和无抗锯齿绘制。OCR 目标使用高对比、大字号文本；OCR
 测试验证语义匹配和裁剪坐标，不要求不同 Windows 字体栅格化结果逐像素一致。
 
-## 20 个二级页面
+## 28 个二级页面
 
 | 编号 | 页面 | 框架能力 | 成功效果 |
 | --- | --- | --- | --- |
@@ -60,7 +65,7 @@ Windows 7 SP1 仍建议安装完整系统更新。Qt 采用动态链接，Qt LGP
 | 09 | `static-text` | `TextClicker::click` | OCR 点击 `CONFIRM` |
 | 10 | `any-text` | `AnyText` | 一次 OCR、候选顺序优先 |
 | 11 | `delayed-text` | `Text` | 等待 `READY` |
-| 12 | `disappearing-text` | 文字反向条件 | `PROCESSING` 消失后继续 |
+| 12 | `disappearing-text` | 文字反向条件 | `CONFIRM` 消失后继续 |
 | 13 | `stable-text` | `TextStable` | 文字框连续三次稳定 |
 | 14 | `text-region` | OCR 推理前 ROI | 只点击区域内文字 |
 | 15 | `previous-relation` | `RIGHT_CENTER` | 从图片 Segment 派生文字 ROI |
@@ -69,6 +74,18 @@ Windows 7 SP1 仍建议安装完整系统更新。Qt 采用动态链接，Qt LGP
 | 18 | `scroll` | wheel + Text Until | 滚动到底部后终止 |
 | 19 | `hidden-layer` | 遮挡与延迟匹配 | 遮挡消失后点击目标 |
 | 20 | `mixed-workflow` | 图片 → 文字 → 图片 | 原链式 API 完成三步操作 |
+| 21 | `optional-untils` | 四种 `If*` Until | 未命中时只检查一次并继续 |
+| 22 | `text-match-modes` | `REGEX` / `FUZZY` / `EXACT` | 三种文字匹配依次完成 |
+| 23 | `ordered-selector` | `orderedRandomSelector` | 只点击最右侧两个候选之一 |
+| 24 | `click-anchor-offset` | `Click::LEFT` + offset | 命中指定相对点击坐标 |
+| 25 | `reverse-drag` | `drag(reverse=true)` | 从底部反向拖入上方区域 |
+| 26 | `upward-scroll` | 正滚轮 delta + finish Until | 单次向上滚动到顶部 |
+| 27 | `multiple-until-and` | 多个 `runUntil` 的 AND | 图片和文字同轮满足才停止 |
+| 28 | `wait-phases` | `startWait` / `finishWait` / `homing` | 两个等待阶段均生效 |
+
+浏览器页面只承担确定、可观察的端到端断言。`randomSelector` 的候选域约束、其余
+`Previous` 方位枚举、停止/超时边界和 Win32 消息参数等不适合页面稳定判定的分支，由
+`workflow.unit` 的 FakePlatform/Fake OCR 测试覆盖。
 
 每个页面都公开一个只用于测试台控制的接口：
 
@@ -78,5 +95,6 @@ window.workflowFixture.reset();       // 清理计时器并恢复初始状态
 window.workflowFixture.state();       // 当前可视化状态
 ```
 
-CTest 中的 `workflow.pages` 会校验页面数量、文件名、`data-case`、catalog 条目和对应 renderer，
-避免新增或重命名页面后留下不完整的测试入口。
+CTest 中的 `workflow.pages` 会校验页面、JSON 流程、`data-case`、catalog 条目和对应
+renderer 一一对应。程序启动时还会用正式 `parseWorkflowFile()` 预解析全部 28 份 JSON，
+任何 schema 错误都会立即报错。

@@ -7,6 +7,7 @@
 #include "core/environment.h"
 #include "core/segment.h"
 #include "core/types.h"
+#include "flow/workflow.h"
 #include "matching/image.h"
 #include "matching/selector.h"
 #include "matching/text.h"

@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "name": "21 可选 Until 一次检查",
+  "clicker": {
+    "kind": "IMAGE",
+    "target": "fixtures/marker-a.png",
+    "config": {
+      "threshold": 0.98,
+      "timeout": 12,
+      "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+    }
+  },
+  "steps": [
+    {
+      "action": "click",
+      "runConfig": {
+        "startUntilList": [
+          {
+            "type": "IfImage",
+            "target": "fixtures/marker-c.png",
+            "config": {
+              "threshold": 0.98,
+              "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+            }
+          },
+          {
+            "type": "IfAnyImage",
+            "targets": ["fixtures/marker-c.png", "fixtures/marker-b.png"],
+            "config": {
+              "threshold": 0.98,
+              "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+            }
+          },
+          {
+            "type": "IfText",
+            "target": "OPTIONAL TEXT",
+            "config": {
+              "threshold": 0.25,
+              "boxThreshold": 0.25,
+              "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+            }
+          },
+          {
+            "type": "IfAnyText",
+            "targets": ["OPTIONAL A", "OPTIONAL B"],
+            "config": {
+              "threshold": 0.25,
+              "boxThreshold": 0.25,
+              "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+            }
+          }
+        ],
+        "finishUntilList": [
+          {
+            "type": "Image",
+            "target": "fixtures/marker-b.png",
+            "config": {
+              "threshold": 0.98,
+              "interval": 0.12,
+              "timeout": 8,
+              "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+            }
+          }
+        ],
+        "homing": false
+      },
+      "interval": 0.1
+    }
+  ]
+}

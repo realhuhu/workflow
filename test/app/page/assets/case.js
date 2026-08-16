@@ -265,7 +265,7 @@
 
         "disappearing-text": function () {
             state.absent = false;
-            var transient = textTarget("PROCESSING", 300, 250, 360);
+            var transient = textTarget("CONFIRM", 330, 250, 300);
             marker("marker-b", 100, 520, function () {
                 if (!state.absent) return fail("STILL PRESENT");
                 completion("ABSENCE PASS");
@@ -427,6 +427,152 @@
                         completion("WORKFLOW COMPLETE");
                         pass("CHAIN COMPLETE");
                     });
+                });
+            });
+        },
+
+        "optional-untils": function () {
+            marker("marker-a", 430, 270, function (event) {
+                event.currentTarget.remove();
+                marker("marker-b", 760, 520);
+                pass("OPTIONAL MISS CONTINUED");
+            });
+        },
+
+        "text-match-modes": function () {
+            var first = marker("marker-a", 430, 270, function () {
+                first.remove();
+                var order = textTarget("ORDER-2048", 320, 270, 340, function () {
+                    order.remove();
+                    var confirm = textTarget("CONFIRM", 340, 270, 280, function () {
+                        confirm.remove();
+                        completion("MATCH MODES PASS");
+                        pass("REGEX / FUZZY / EXACT");
+                    });
+                });
+            });
+        },
+
+        "ordered-selector": function () {
+            [100, 320, 580, 780].forEach(function (x, index) {
+                marker("marker-a", x, 270, function () {
+                    if (index < 2) return fail("OUTSIDE TOP 2");
+                    marker("marker-b", 760, 520);
+                    pass("ORDERED TOP 2");
+                });
+            });
+        },
+
+        "click-anchor-offset": function () {
+            marker("marker-a", 430, 270, function (event) {
+                if (Math.abs(event.offsetX - 12) > 4 || Math.abs(event.offsetY - 24) > 4) {
+                    return fail("WRONG OFFSET " + event.offsetX + "," + event.offsetY);
+                }
+                marker("marker-b", 760, 520);
+                pass("LEFT + (12, 0)");
+            });
+        },
+
+        "reverse-drag": function () {
+            var zone = document.createElement("div");
+            zone.className = "drop-zone";
+            zone.textContent = "UPPER DROP ZONE";
+            zone.style.width = "200px";
+            zone.style.height = "130px";
+            position(zone, 374, 70);
+            stage().appendChild(zone);
+
+            var piece = marker("marker-a", 450, 500, null, "clickable");
+            var dragging = false;
+            var startY = 0;
+            var originTop = 0;
+            function down(event) {
+                event.preventDefault();
+                dragging = true;
+                startY = event.clientY;
+                originTop = parseInt(piece.style.top, 10);
+            }
+            function move(event) {
+                if (!dragging) return;
+                piece.style.top = Math.max(60, Math.min(540, originTop + event.clientY - startY)) + "px";
+            }
+            function up() {
+                if (!dragging) return;
+                dragging = false;
+                var center = parseInt(piece.style.top, 10) + 24;
+                if (center < 70 || center > 200) return;
+                completion("REVERSE DRAG COMPLETE", 300, 300);
+                pass("DRAGGED UP");
+            }
+            piece.addEventListener("mousedown", down);
+            document.addEventListener("mousemove", move);
+            document.addEventListener("mouseup", up);
+            cleanups.push(function () {
+                document.removeEventListener("mousemove", move);
+                document.removeEventListener("mouseup", up);
+            });
+        },
+
+        "upward-scroll": function () {
+            var viewport = document.createElement("div");
+            viewport.className = "scroll-viewport";
+            viewport.style.left = "158px";
+            viewport.style.top = "70px";
+            viewport.style.width = "640px";
+            viewport.style.height = "500px";
+            var content = document.createElement("div");
+            content.className = "scroll-content";
+            var anchor = document.createElement("img");
+            anchor.className = "fixture-marker scroll-anchor";
+            anchor.src = markerRoot + "marker-a.png";
+            anchor.alt = "marker-a";
+            anchor.draggable = false;
+            anchor.setAttribute("data-target", "marker-a");
+            var finish = document.createElement("div");
+            finish.className = "completion";
+            finish.textContent = "SCROLL UP COMPLETE";
+            finish.setAttribute("data-target", "SCROLL UP COMPLETE");
+            position(finish, 134, 48);
+            content.appendChild(anchor);
+            content.appendChild(finish);
+            viewport.appendChild(content);
+            stage().appendChild(viewport);
+            viewport.scrollTop = viewport.scrollHeight;
+            viewport.addEventListener("scroll", function () {
+                if (viewport.scrollTop > 24) return;
+                pass("TOP REACHED");
+            });
+        },
+
+        "multiple-until-and": function () {
+            state.clicks = 0;
+            var counter = document.createElement("div");
+            counter.className = "counter";
+            position(counter, 420, 350);
+            stage().appendChild(counter);
+            function update() { counter.textContent = "AND ROUND / " + state.clicks; }
+            update();
+            marker("marker-a", 450, 240, function () {
+                state.clicks += 1;
+                update();
+                if (state.clicks === 2) marker("marker-b", 760, 520);
+                if (state.clicks < 3) return;
+                completion("BOTH READY");
+                pass("IMAGE AND TEXT");
+            });
+        },
+
+        "wait-phases": function () {
+            state.startedAt = performance.now();
+            marker("marker-a", 430, 270, function (event) {
+                if (performance.now() - state.startedAt < 500) return fail("START WAIT EARLY");
+                event.currentTarget.remove();
+                state.revealedAt = performance.now();
+                marker("marker-b", 430, 270, function (nextEvent) {
+                    if (performance.now() - state.revealedAt < 500) return fail("FINISH WAIT EARLY");
+                    nextEvent.currentTarget.remove();
+                    marker("marker-c", 760, 520);
+                    pass("WAIT PHASES PASS");
                 });
             });
         }

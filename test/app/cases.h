@@ -16,7 +16,13 @@ struct TestCase {
     QString description;
 };
 
+enum class TestWorkflowSource {
+    CPP,
+    JSON,
+};
+
 [[nodiscard]] const std::vector<TestCase>& testCases();
-void runTestCase(int id);
+void validateJsonTestCases(const QString& workflowRoot);
+void runTestCase(int id, TestWorkflowSource source, const QString& workflowRoot);
 
 #endif // WORKFLOW_TEST_APP_CASES_H

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "name": "09 静态文字点击",
+  "clicker": {
+    "kind": "TEXT",
+    "target": "CONFIRM",
+    "config": {
+      "timeout": 12,
+      "region": {"x": 20, "y": 120, "width": 960, "height": 660},
+      "match": {"threshold": 0.25, "boxThreshold": 0.25}
+    }
+  },
+  "steps": [
+    {
+      "action": "click",
+      "runConfig": {
+        "finishUntilList": [
+          {
+            "type": "Text",
+            "target": "TEXT CLICKED",
+            "config": {
+              "threshold": 0.25,
+              "interval": 0.12,
+              "timeout": 8,
+              "boxThreshold": 0.25,
+              "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+            }
+          }
+        ],
+        "homing": false
+      },
+      "interval": 0.1
+    }
+  ]
+}

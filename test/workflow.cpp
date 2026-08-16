@@ -3,6 +3,9 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QTemporaryDir>
 
 #include <opencv2/imgcodecs.hpp>
@@ -1194,6 +1197,293 @@ namespace {
         return path;
     }
 
+    QJsonObject imageCondition(
+        const QString& type,
+        const QString& target,
+        const float threshold = 0.999f
+    ) {
+        return {
+            {"type", type},
+            {"target", target},
+            {"config",
+                QJsonObject{
+                    {"threshold", threshold},
+                    {"interval", 0},
+                }},
+        };
+    }
+
+    QJsonObject textCondition(
+        const QString& type,
+        const QString& target
+    ) {
+        return {
+            {"type", type},
+            {"target", target},
+            {"config",
+                QJsonObject{
+                    {"match", "EXACT"},
+                    {"interval", 0},
+                }},
+        };
+    }
+
+    QJsonObject mixedWorkflowJson(
+        const QString& initialPath,
+        const QString& finalPath
+    ) {
+        return {
+            {"version", 1},
+            {"name", QString::fromUtf8("JSON图片文字链")},
+            {"clicker",
+                QJsonObject{
+                    {"kind", "IMAGE"},
+                    {"target", initialPath},
+                    {"config",
+                        QJsonObject{
+                            {"threshold", 0.999},
+                            {"mode", "GRAY"},
+                        }},
+                }},
+            {"steps",
+                QJsonArray{
+                    QJsonObject{
+                        {"action", "locate"},
+                        {"runConfig",
+                            QJsonObject{
+                                {"finishUntilList", QJsonArray{textCondition("Text", QString::fromUtf8("文字目标"))}},
+                                {"homing", false},
+                            }},
+                    },
+                    QJsonObject{
+                        {"action", "locate"},
+                        {"runConfig",
+                            QJsonObject{
+                                {"finishUntilList", QJsonArray{imageCondition("Image", finalPath)}},
+                                {"homing", false},
+                            }},
+                    },
+                    QJsonObject{
+                        {"action", "scroll"},
+                        {"runConfig",
+                            QJsonObject{
+                                {"selector",
+                                    QJsonObject{
+                                        {"type", "position"},
+                                        {"basis", "X_CENTER"},
+                                        {"method", "MAX"},
+                                    }},
+                                {"homing", false},
+                            }},
+                        {"delta", WheelDelta},
+                        {"interval", 0},
+                        {"offsetX", 2},
+                        {"offsetY", -3},
+                        {"position", "CENTER"},
+                    },
+                }},
+        };
+    }
+
+    void testJsonWorkflowRunsTheExistingClickerChainAndReturnsTheLastClicker() {
+        QTemporaryDir directory;
+        EXPECT_TRUE(directory.isValid());
+
+        cv::Mat initialTemplate(9, 11, CV_8UC1);
+        cv::Mat finalTemplate(8, 10, CV_8UC1);
+        cv::Mat screen(90, 120, CV_8UC1);
+        cv::RNG initialRng(0x7512);
+        cv::RNG finalRng(0x2357);
+        cv::RNG screenRng(0x9154);
+        initialRng.fill(initialTemplate, cv::RNG::UNIFORM, 0, 256);
+        finalRng.fill(finalTemplate, cv::RNG::UNIFORM, 0, 256);
+        screenRng.fill(screen, cv::RNG::UNIFORM, 0, 80);
+        initialTemplate.copyTo(screen(cv::Rect(12, 17, initialTemplate.cols, initialTemplate.rows)));
+        finalTemplate.copyTo(screen(cv::Rect(76, 54, finalTemplate.cols, finalTemplate.rows)));
+        const QString initialPath = writePng(initialTemplate, directory.filePath("initial.png"));
+        const QString finalPath = writePng(finalTemplate, directory.filePath("final.png"));
+
+        FakePlatform platform(screen);
+        FakeOcrProvider provider;
+        provider.handler = [](const cv::Mat&, int) {
+            return successfulResult({token(QString::fromUtf8("文字目标"), QRect(35, 28, 24, 12))});
+        };
+        EnvScope scope(&platform, &provider);
+
+        const QByteArray json = QJsonDocument(mixedWorkflowJson(initialPath, finalPath)).toJson(QJsonDocument::Compact);
+        const Workflow workflow = parseWorkflow(json);
+        EXPECT_EQ(workflow.name(), QString::fromUtf8("JSON图片文字链"));
+        EXPECT_EQ(workflow.stepCount(), std::size_t(3));
+
+        auto last = workflow.run();
+        EXPECT_TRUE(static_cast<bool>(last));
+        EXPECT_EQ(last->kind, MatchKind::IMAGE);
+        EXPECT_EQ(last->target, finalPath);
+        EXPECT_TRUE(last->founded());
+        EXPECT_EQ(last->targetSegmentList.front().x, 76);
+        EXPECT_EQ(last->targetSegmentList.front().y, 54);
+        EXPECT_EQ(provider.calls, 1);
+        EXPECT_EQ(platform.wheelEvents().size(), std::size_t(1));
+        EXPECT_EQ(platform.wheelEvents().front().from, QPoint(83, 55));
+        EXPECT_EQ(platform.wheelEvents().front().delta, WheelDelta);
+
+        const QString workflowPath = directory.filePath("workflow.json");
+        QFile file(workflowPath);
+        EXPECT_TRUE(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        EXPECT_EQ(file.write(json), static_cast<qint64>(json.size()));
+        file.close();
+
+        const Workflow fromFile = parseWorkflowFile(workflowPath);
+        auto rerun = fromFile.run();
+        EXPECT_EQ(rerun->kind, MatchKind::IMAGE);
+        EXPECT_EQ(rerun->target, finalPath);
+        EXPECT_EQ(provider.calls, 2);
+        EXPECT_EQ(platform.wheelEvents().size(), std::size_t(2));
+    }
+
+    void testJsonWorkflowRejectsInvalidApiCombinationsDuringParsing() {
+        const auto valid = mixedWorkflowJson("initial.png", "final.png");
+
+        auto badVersion = valid;
+        badVersion["version"] = 2;
+        EXPECT_THROWS(std::invalid_argument, parseWorkflow(badVersion));
+
+        auto textSelector = valid;
+        auto clicker = textSelector["clicker"].toObject();
+        clicker["kind"] = "TEXT";
+        textSelector["clicker"] = clicker;
+        auto steps = textSelector["steps"].toArray();
+        auto first = steps[0].toObject();
+        auto runConfig = first["runConfig"].toObject();
+        runConfig["selector"] = QJsonObject{{"type", "similarity"}};
+        first["runConfig"] = runConfig;
+        steps[0] = first;
+        textSelector["steps"] = steps;
+        EXPECT_THROWS(std::invalid_argument, parseWorkflow(textSelector));
+
+        auto locateWithRunUntil = valid;
+        steps = locateWithRunUntil["steps"].toArray();
+        first = steps[0].toObject();
+        runConfig = first["runConfig"].toObject();
+        runConfig["runUntilList"] = QJsonArray{imageCondition("Image", "target.png")};
+        first["runConfig"] = runConfig;
+        steps[0] = first;
+        locateWithRunUntil["steps"] = steps;
+        EXPECT_THROWS(std::invalid_argument, parseWorkflow(locateWithRunUntil));
+
+        EXPECT_THROWS(std::invalid_argument, parseWorkflow(QByteArray("[1,2,3]")));
+        EXPECT_THROWS(std::invalid_argument, parseWorkflow(QByteArray("{broken")));
+    }
+
+    void testJsonWorkflowParsesEveryCurrentActionAndUntilType() {
+        QJsonArray allConditions;
+        for (const QString& type : QStringList{"Image", "ImageStable", "IfImage"}) {
+            allConditions.append(imageCondition(type, "image.png"));
+        }
+        for (const QString& type : QStringList{"AnyImage", "IfAnyImage"}) {
+            allConditions.append(
+                QJsonObject{
+                    {"type", type},
+                    {"targets", QJsonArray{"first.png", "second.png"}},
+                    {"config", QJsonObject{{"interval", 0}}},
+                }
+            );
+        }
+        for (const QString& type : QStringList{"Text", "TextStable", "IfText"}) {
+            allConditions.append(textCondition(type, QString::fromUtf8("文字")));
+        }
+        for (const QString& type : QStringList{"AnyText", "IfAnyText"}) {
+            allConditions.append(
+                QJsonObject{
+                    {"type", type},
+                    {"targets", QJsonArray{QString::fromUtf8("甲"), QString::fromUtf8("乙")}},
+                    {"config", QJsonObject{{"match", "EXACT"}, {"interval", 0}}},
+                }
+            );
+        }
+
+        const QJsonObject object{
+            {"version", 1},
+            {"name", "API coverage"},
+            {"clicker",
+                QJsonObject{
+                    {"kind", "IMAGE"},
+                    {"target", "initial.png"},
+                    {"config", QJsonObject{}},
+                }},
+            {"steps",
+                QJsonArray{
+                    QJsonObject{
+                        {"action", "click"},
+                        {"runConfig",
+                            QJsonObject{
+                                {"startUntilList", allConditions},
+                                {"selector",
+                                    QJsonObject{
+                                        {"type", "orderedRandom"},
+                                        {"basis", "Y_CENTER"},
+                                        {"method", "MIN"},
+                                        {"top", 2},
+                                    }},
+                            }},
+                    },
+                    QJsonObject{
+                        {"action", "drag"},
+                        {"runConfig",
+                            QJsonObject{
+                                {"finishUntilList", QJsonArray{textCondition("Text", QString::fromUtf8("完成"))}},
+                            }},
+                        {"step", 12},
+                        {"reverse", true},
+                    },
+                    QJsonObject{
+                        {"action", "locate"},
+                        {"runConfig",
+                            QJsonObject{
+                                {"finishUntilList",
+                                    QJsonArray{
+                                        QJsonObject{
+                                            {"type", "AnyImage"},
+                                            {"targets", QJsonArray{"first.png", "second.png"}},
+                                        },
+                                    }},
+                            }},
+                    },
+                    QJsonObject{
+                        {"action", "scroll"},
+                        {"runConfig", QJsonObject{}},
+                    },
+                }},
+        };
+        const Workflow workflow = parseWorkflow(object);
+        EXPECT_EQ(workflow.stepCount(), std::size_t(4));
+
+        const QJsonObject textEntry{
+            {"version", 1},
+            {"name", "Text entry"},
+            {"clicker",
+                QJsonObject{
+                    {"kind", "TEXT"},
+                    {"target", QString::fromUtf8("确认")},
+                    {"config",
+                        QJsonObject{
+                            {"mode", "RGB"},
+                            {"region", QJsonObject{{"x", 10}, {"y", 20}, {"width", 100}, {"height", 50}}},
+                            {"match",
+                                QJsonObject{
+                                    {"match", "FUZZY"},
+                                    {"caseSensitivity", "INSENSITIVE"},
+                                    {"maxEditDistance", 2},
+                                    {"candidates", QJsonArray{}},
+                                }},
+                            {"resolvedRegion", QJsonValue::Null},
+                        }},
+                }},
+            {"steps", QJsonArray{}},
+        };
+        EXPECT_EQ(parseWorkflow(textEntry).stepCount(), std::size_t(0));
+    }
+
     void testUnifiedClickerImageTextImageChain() {
         QTemporaryDir directory;
         EXPECT_TRUE(directory.isValid());
@@ -1449,10 +1739,22 @@ namespace {
         EXPECT_EQ(similaritySelector(candidates).score, 0.9f);
         EXPECT_EQ(positionSelector(SelectorBasis::X_CENTER, SelectorMethod::MIN)(candidates).x, 10);
         EXPECT_EQ(positionSelector(SelectorBasis::X_CENTER, SelectorMethod::MAX)(candidates).x, 70);
+        const Segment random = randomSelector(candidates);
+        EXPECT_TRUE(std::any_of(candidates.begin(), candidates.end(), [&random](const Segment& candidate) {
+            return candidate == random;
+        }));
+        const Segment orderedRandom =
+            orderedRandomSelector(SelectorBasis::X_CENTER, SelectorMethod::MAX, 2)(candidates);
+        EXPECT_TRUE(orderedRandom.x == 70 || orderedRandom.x == 45);
+        EXPECT_THROWS(
+            std::invalid_argument,
+            orderedRandomSelector(SelectorBasis::X_CENTER, SelectorMethod::MAX, 0)(candidates)
+        );
         EXPECT_THROWS(
             std::invalid_argument,
             positionSelector(static_cast<SelectorBasis>(999), SelectorMethod::MIN)(candidates)
         );
+        EXPECT_THROWS(std::runtime_error, randomSelector(std::vector<Segment>{}));
         EXPECT_THROWS(std::runtime_error, similaritySelector(std::vector<Segment>{}));
 
         auto previous = std::make_unique<Segment>(40, 40, 20, 20, 1.0f);
@@ -1513,6 +1815,18 @@ namespace {
         }));
     }
 
+    void testBrowserJsonWorkflowsAllParse() {
+        const QDir root(QString::fromUtf8(WORKFLOW_TEST_WORKFLOW_ROOT));
+        const QStringList files = root.entryList({QStringLiteral("*.json")}, QDir::Files, QDir::Name);
+        EXPECT_EQ(files.size(), 28);
+
+        for (const QString& file : files) {
+            const Workflow workflow = parseWorkflowFile(root.filePath(file));
+            EXPECT_TRUE(!workflow.name().isEmpty());
+            EXPECT_TRUE(workflow.stepCount() > 0);
+        }
+    }
+
     using Test = std::pair<const char*, std::function<void()>>;
 
 } // namespace
@@ -1544,6 +1858,13 @@ int main(
         {"unified Clicker preserves AnyImage and AnyText targets", testUnifiedClickerTextAnyImageAnyTextChain},
         {"scroll supports every Until family and optional conditions are one-shot",
             testScrollSupportsEveryUntilFamilyAndOptionalConditionsAreOneShot},
+        {"JSON workflow executes the existing Clicker chain and returns its last Clicker",
+            testJsonWorkflowRunsTheExistingClickerChainAndReturnsTheLastClicker},
+        {"JSON workflow rejects invalid API combinations during parsing",
+            testJsonWorkflowRejectsInvalidApiCombinationsDuringParsing},
+        {"JSON workflow parses every current action and Until type",
+            testJsonWorkflowParsesEveryCurrentActionAndUntilType},
+        {"all browser JSON workflows parse with the production parser", testBrowserJsonWorkflowsAllParse},
         {"image matching honors ROI global coordinates and NMS",
             testImageTemplateMatchingUsesRoiGlobalCoordinatesAndNms},
         {"selectors and Previous filter", testSelectorsAndPreviousFilter},

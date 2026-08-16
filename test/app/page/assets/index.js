@@ -21,7 +21,7 @@
             "<div class=\"calibration-chip\" id=\"environment-chip\">CHECKING</div>" +
         "</header>" +
         "<section class=\"index-intro\">" +
-            "<p>20 个离线二级页面，覆盖图片、OCR、Until、点击、拖动、滚动和混合链。</p>" +
+            "<p>28 个离线二级页面，覆盖图片、OCR、Until、点击、拖动、滚动和混合链。</p>" +
             "<span>固定画布 1000 × 800 · DPR 1 · Zoom 100%</span>" +
         "</section>" +
         "<main class=\"case-grid\">" + cards + "</main>";

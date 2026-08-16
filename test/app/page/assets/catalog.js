@@ -21,7 +21,15 @@
         { id: 17, slug: "drag", title: "纵向拖动", group: "ACTION", api: "drag", summary: "拖动并重新匹配，直到进入投放区。" },
         { id: 18, slug: "scroll", title: "滚轮滚动", group: "ACTION", api: "scroll + Text", summary: "当前页未满足时才发送滚轮。" },
         { id: 19, slug: "hidden-layer", title: "遮挡层消失", group: "UNTIL", api: "Image + overlay", summary: "遮挡移除后模板才可命中。" },
-        { id: 20, slug: "mixed-workflow", title: "图片文字混合链", group: "MIXED", api: "Image → Text → Image", summary: "验证跨匹配类型的原始链式 API。" }
+        { id: 20, slug: "mixed-workflow", title: "图片文字混合链", group: "MIXED", api: "Image → Text → Image", summary: "验证跨匹配类型的原始链式 API。" },
+        { id: 21, slug: "optional-untils", title: "可选 Until 一次检查", group: "UNTIL", api: "IfImage / IfText", summary: "四类可选条件未命中时不阻塞动作。" },
+        { id: 22, slug: "text-match-modes", title: "文字匹配模式链", group: "TEXT", api: "REGEX → FUZZY → EXACT", summary: "一条链覆盖正则、模糊和精确文字匹配。" },
+        { id: 23, slug: "ordered-selector", title: "有序随机选择器", group: "IMAGE", api: "orderedRandomSelector", summary: "只在排序后的前两个目标中选择。" },
+        { id: 24, slug: "click-anchor-offset", title: "点击锚点与偏移", group: "ACTION", api: "Click::LEFT + offset", summary: "校验锚点和偏移合成的客户区坐标。" },
+        { id: 25, slug: "reverse-drag", title: "反向纵向拖动", group: "ACTION", api: "drag(reverse=true)", summary: "从底部向上拖动并由文字条件终止。" },
+        { id: 26, slug: "upward-scroll", title: "滚轮向上单次滚动", group: "ACTION", api: "scroll(delta > 0)", summary: "正 delta 单次滚动后等待文字完成条件。" },
+        { id: 27, slug: "multiple-until-and", title: "多条件 AND 终止", group: "UNTIL", api: "runUntilList AND", summary: "图片和文字必须在同一轮同时满足。" },
+        { id: 28, slug: "wait-phases", title: "执行阶段等待与归位", group: "LIFECYCLE", api: "startWait / finishWait / homing", summary: "覆盖动作前后等待与归位开关。" }
     ];
 
     window.workflowEnvironment = function () {

@@ -15,7 +15,6 @@
       "toolset": "v142",
       "cacheVariables": {
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/build/sdk-stage",
-        "WORKFLOW_BUILD_EXAMPLES": "ON",
         "WORKFLOW_BUILD_TESTS": "ON",
         "WORKFLOW_BUILD_TEST_APP": "ON",
         "WORKFLOW_INSTALL": "ON",

@@ -122,8 +122,12 @@ a {
 .case-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
+    grid-auto-rows: 112px;
+    align-content: start;
     gap: 9px;
     height: 616px;
+    padding-right: 6px;
+    overflow-y: auto;
 }
 
 .case-card {

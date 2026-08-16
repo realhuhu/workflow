@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(workflow VERSION 0.1.3 LANGUAGES CXX)
+project(workflow VERSION 0.2.0 LANGUAGES CXX)
 
 if (NOT WIN32)
     message(FATAL_ERROR "workflow currently supports Windows only")
@@ -23,7 +23,6 @@ else()
     set(_workflow_developer_default OFF)
 endif()
 
-option(WORKFLOW_BUILD_EXAMPLES "Build workflow examples" ${_workflow_developer_default})
 option(WORKFLOW_BUILD_TESTS "Build workflow tests" ${_workflow_developer_default})
 option(WORKFLOW_BUILD_TEST_APP
         "Build the Qt WebEngine visual test application"
@@ -174,6 +173,8 @@ set(WORKFLOW_SOURCES
         src/core/segment.h
         src/core/types.cpp
         src/core/types.h
+        src/flow/workflow.cpp
+        src/flow/workflow.h
         src/matching/image.cpp
         src/matching/image.h
         src/matching/selector.cpp
@@ -344,41 +345,6 @@ function(workflow_stage_runtime target)
         endforeach()
     endif()
 endfunction()
-
-if (WORKFLOW_BUILD_EXAMPLES)
-    add_executable(workflow_example example/mixed.cpp)
-    target_link_libraries(workflow_example PRIVATE workflow::workflow)
-    workflow_enable_windows7(workflow_example)
-    workflow_stage_runtime(workflow_example)
-
-    if (PROJECT_IS_TOP_LEVEL)
-        find_program(WORKFLOW_POWERSHELL_EXECUTABLE NAMES pwsh powershell REQUIRED)
-        if (WORKFLOW_OPENCV_WORLD)
-            set(_workflow_opencv_audit_dll
-                    "${WORKFLOW_OPENCV_BIN_DIR}/opencv_world4100$<$<CONFIG:Debug>:d>.dll")
-        else()
-            set(_workflow_opencv_audit_dll
-                    "${WORKFLOW_OPENCV_BIN_DIR}/opencv_core4100$<$<CONFIG:Debug>:d>.dll")
-        endif()
-        add_custom_target(workflow_win7_audit
-                COMMAND "${WORKFLOW_POWERSHELL_EXECUTABLE}"
-                        -NoProfile
-                        -ExecutionPolicy Bypass
-                        -File "${CMAKE_CURRENT_SOURCE_DIR}/tool/audit.ps1"
-                        "$<TARGET_FILE:workflow_example>"
-                        "${WORKFLOW_ONNXRUNTIME_RUNTIME}"
-                        "$<TARGET_FILE:Qt5::Core>"
-                        "${_workflow_opencv_audit_dll}"
-                        "$<TARGET_FILE:workflow_win7_libraryloader>"
-                        "$<TARGET_FILE:workflow_win7_processtopology>"
-                        "$<TARGET_FILE:workflow_win7_eventing>"
-                        "$<TARGET_FILE:workflow_win7_heap>"
-                        "$<TARGET_FILE:workflow_win7_shlwapi>"
-                DEPENDS workflow_example
-                COMMENT "Auditing PE subsystem versions and post-Windows-7 imports"
-                VERBATIM)
-    endif()
-endif()
 
 if (WORKFLOW_BUILD_TESTS)
     enable_testing()

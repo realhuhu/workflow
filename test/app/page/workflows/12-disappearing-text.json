@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "name": "12 等待文字消失",
+  "clicker": {
+    "kind": "IMAGE",
+    "target": "fixtures/marker-b.png",
+    "config": {
+      "threshold": 0.98,
+      "timeout": 12,
+      "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+    }
+  },
+  "steps": [
+    {
+      "action": "click",
+      "runConfig": {
+        "startUntilList": [
+          {
+            "type": "Text",
+            "target": "CONFIRM",
+            "config": {
+              "threshold": 0.25,
+              "interval": 0.12,
+              "timeout": 8,
+              "reverse": true,
+              "boxThreshold": 0.25,
+              "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+            }
+          }
+        ],
+        "finishUntilList": [
+          {
+            "type": "Text",
+            "target": "ABSENCE PASS",
+            "config": {
+              "threshold": 0.25,
+              "interval": 0.12,
+              "timeout": 8,
+              "boxThreshold": 0.25,
+              "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+            }
+          }
+        ],
+        "homing": false
+      },
+      "interval": 0.1
+    }
+  ]
+}

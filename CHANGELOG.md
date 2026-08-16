@@ -4,6 +4,15 @@
 
 ## Unreleased
 
+## 0.2.0
+
+- 增加 JSON v1 线性工作流解析器；可解析现有 Image/Text Clicker、四种动作和全部 Until，重复运行后返回链条最后一个 Clicker。
+- `workflow-test` 增加 C++/JSON 流程来源切换，28 个可视化用例均提供与原链式 API 等价的 JSON。
+- 扩展 Browser 测试覆盖：四种可选 Until、三种文字匹配模式、有序选择器、点击锚点、反向拖动、向上滚动、多条件 AND 与执行阶段等待；右侧日志按面板宽度自动换行。
+- Browser 测试程序支持一次运行全部 28 × 2 个 C++/JSON 流程，逐项重置和校准、失败后继续并输出批量汇总。
+- 稳定 Browser 批量用例中的图片点击、文字消失、模糊文字匹配和双向滚轮场景，消除网页事件、OCR 拆框及异步滚动造成的偶发超时。
+- 移除命令行 `workflow_example` 及其专用构建选项，保留 SDK、单元测试和 Browser 测试程序。
+
 ## 0.1.3
 
 - 将仓库顶层收口为 `src`、`test`、`example`、`resource`、`tool` 和 `cmake`，删除被版本控制的 IDE 配置。

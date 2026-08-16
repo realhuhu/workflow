@@ -373,7 +373,7 @@ $testSlimDescription = @(
     'Package: Workflow Test',
     'Variant: slim',
     'Requires: Windows 10 x64 and Microsoft Visual C++ 2015-2022 Redistributable x64.',
-    'Contains: test application, Qt, OpenCV, ONNX Runtime, OCR models, 20 test pages, and licenses.'
+    'Contains: test application, Qt, OpenCV, ONNX Runtime, OCR models, 28 test pages, and licenses.'
 )
 $testCompatibleDescription = @(
     'Package: Workflow Test',

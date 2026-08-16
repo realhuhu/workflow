@@ -2,6 +2,7 @@
 
 #include "workflow.h"
 
+#include <QDir>
 #include <QMargins>
 #include <QRect>
 
@@ -40,6 +41,7 @@ namespace {
                                 }
                             ),
                         },
+                    .finishWait = 0.5f,
                     .homing = false,
                 },
                 0.1f
@@ -456,7 +458,7 @@ namespace {
                     .startUntilList =
                         {
                             new Text(
-                                QStringLiteral("PROCESSING"),
+                                QStringLiteral("CONFIRM"),
                                 TextUntilConfig{
                                     .threshold = 0.25f,
                                     .interval = 0.12f,
@@ -706,7 +708,7 @@ namespace {
                     .homing = false,
                 },
                 -WheelDelta * 4,
-                0.15f
+                0.5f
             )
             ->end();
     }
@@ -826,6 +828,361 @@ namespace {
             ->end();
     }
 
+    void runOptionalUntils() {
+        std::make_unique<ImageClicker>(
+            MarkerA,
+            ImageInitConfig{
+                .threshold = 0.98f,
+                .timeout = 12,
+                .region = StageRegion,
+            }
+        )
+            ->click(
+                ImageRunConfig{
+                    .startUntilList =
+                        {
+                            new IfImage(
+                                MarkerC,
+                                ImageUntilConfig{
+                                    .threshold = 0.98f,
+                                    .region = StageRegion,
+                                }
+                            ),
+                            new IfAnyImage(
+                                std::vector<QString>{MarkerC, MarkerB},
+                                ImageUntilConfig{
+                                    .threshold = 0.98f,
+                                    .region = StageRegion,
+                                }
+                            ),
+                            new IfText(
+                                QStringLiteral("OPTIONAL TEXT"),
+                                TextUntilConfig{
+                                    .threshold = 0.25f,
+                                    .boxThreshold = 0.25f,
+                                    .region = StageRegion,
+                                }
+                            ),
+                            new IfAnyText(
+                                std::vector<QString>{QStringLiteral("OPTIONAL A"), QStringLiteral("OPTIONAL B")},
+                                TextUntilConfig{
+                                    .threshold = 0.25f,
+                                    .boxThreshold = 0.25f,
+                                    .region = StageRegion,
+                                }
+                            ),
+                        },
+                    .finishUntilList =
+                        {
+                            new Image(
+                                MarkerB,
+                                ImageUntilConfig{
+                                    .threshold = 0.98f,
+                                    .interval = 0.12f,
+                                    .timeout = 8,
+                                    .region = StageRegion,
+                                }
+                            ),
+                        },
+                    .homing = false,
+                },
+                0.1f
+            )
+            ->end();
+    }
+
+    void runTextMatchModes() {
+        std::make_unique<ImageClicker>(
+            MarkerA,
+            ImageInitConfig{
+                .threshold = 0.98f,
+                .timeout = 12,
+                .region = StageRegion,
+            }
+        )
+            ->click(
+                ImageRunConfig{
+                    .finishUntilList =
+                        {
+                            new Text(
+                                QStringLiteral("ORDER-[0-9]{4}"),
+                                TextUntilConfig{
+                                    .threshold = 0.25f,
+                                    .interval = 0.12f,
+                                    .timeout = 8,
+                                    .match = TextMatch::REGEX,
+                                    .boxThreshold = 0.25f,
+                                    .region = StageRegion,
+                                }
+                            ),
+                        },
+                    .homing = false,
+                },
+                0.1f
+            )
+            ->click(
+                TextRunConfig{
+                    .finishUntilList =
+                        {
+                            new Text(
+                                QStringLiteral("CONFIRN"),
+                                TextUntilConfig{
+                                    .threshold = 0.25f,
+                                    .interval = 0.12f,
+                                    .timeout = 8,
+                                    .match = TextMatch::FUZZY,
+                                    .boxThreshold = 0.25f,
+                                    .maxEditDistance = 1,
+                                    .region = StageRegion,
+                                }
+                            ),
+                        },
+                    .homing = false,
+                },
+                0.1f
+            )
+            ->click(
+                TextRunConfig{
+                    .finishUntilList =
+                        {
+                            new Text(
+                                QStringLiteral("MATCH MODES PASS"),
+                                TextUntilConfig{
+                                    .threshold = 0.25f,
+                                    .interval = 0.12f,
+                                    .timeout = 8,
+                                    .match = TextMatch::EXACT,
+                                    .boxThreshold = 0.25f,
+                                    .region = StageRegion,
+                                }
+                            ),
+                        },
+                    .homing = false,
+                },
+                0.1f
+            )
+            ->end();
+    }
+
+    void runOrderedSelector() {
+        std::make_unique<ImageClicker>(
+            MarkerA,
+            ImageInitConfig{
+                .threshold = 0.98f,
+                .timeout = 12,
+                .region = StageRegion,
+            }
+        )
+            ->click(
+                ImageRunConfig{
+                    .selector = orderedRandomSelector(SelectorBasis::X_CENTER, SelectorMethod::MAX, 2),
+                    .finishUntilList =
+                        {
+                            new Image(
+                                MarkerB,
+                                ImageUntilConfig{
+                                    .threshold = 0.98f,
+                                    .interval = 0.12f,
+                                    .timeout = 8,
+                                    .region = StageRegion,
+                                }
+                            ),
+                        },
+                    .homing = false,
+                },
+                0.1f
+            )
+            ->end();
+    }
+
+    void runClickAnchorOffset() {
+        std::make_unique<ImageClicker>(
+            MarkerA,
+            ImageInitConfig{
+                .threshold = 0.98f,
+                .timeout = 12,
+                .region = StageRegion,
+            }
+        )
+            ->click(
+                ImageRunConfig{
+                    .finishUntilList =
+                        {
+                            new Image(
+                                MarkerB,
+                                ImageUntilConfig{
+                                    .threshold = 0.98f,
+                                    .interval = 0.12f,
+                                    .timeout = 8,
+                                    .region = StageRegion,
+                                }
+                            ),
+                        },
+                    .homing = false,
+                },
+                0.1f,
+                12,
+                0,
+                Click::LEFT
+            )
+            ->end();
+    }
+
+    void runReverseDrag() {
+        std::make_unique<ImageClicker>(
+            MarkerA,
+            ImageInitConfig{
+                .threshold = 0.98f,
+                .timeout = 12,
+                .region = StageRegion,
+            }
+        )
+            ->drag(
+                ImageRunConfig{
+                    .runUntilList =
+                        {
+                            new Text(
+                                QStringLiteral("REVERSE DRAG COMPLETE"),
+                                TextUntilConfig{
+                                    .threshold = 0.25f,
+                                    .interval = 0.12f,
+                                    .timeout = 8,
+                                    .boxThreshold = 0.25f,
+                                    .region = StageRegion,
+                                }
+                            ),
+                        },
+                    .homing = false,
+                },
+                120,
+                true
+            )
+            ->end();
+    }
+
+    void runUpwardScroll() {
+        std::make_unique<ImageClicker>(
+            MarkerA,
+            ImageInitConfig{
+                .threshold = 0.98f,
+                .timeout = 12,
+                .region = StageRegion,
+            }
+        )
+            ->scroll(
+                ImageRunConfig{
+                    .finishUntilList =
+                        {
+                            new Text(
+                                QStringLiteral("SCROLL UP COMPLETE"),
+                                TextUntilConfig{
+                                    .threshold = 0.25f,
+                                    .interval = 0.12f,
+                                    .timeout = 8,
+                                    .boxThreshold = 0.25f,
+                                    .region = QRect(170, 180, 660, 530),
+                                }
+                            ),
+                        },
+                    .finishWait = 0.5f,
+                    .homing = false,
+                },
+                WheelDelta * 20,
+                0.15f
+            )
+            ->end();
+    }
+
+    void runMultipleUntilAnd() {
+        std::make_unique<ImageClicker>(
+            MarkerA,
+            ImageInitConfig{
+                .threshold = 0.98f,
+                .timeout = 12,
+                .region = StageRegion,
+            }
+        )
+            ->click(
+                ImageRunConfig{
+                    .runUntilList =
+                        {
+                            new Image(
+                                MarkerB,
+                                ImageUntilConfig{
+                                    .threshold = 0.98f,
+                                    .interval = 0.12f,
+                                    .timeout = 8,
+                                    .region = StageRegion,
+                                }
+                            ),
+                            new Text(
+                                QStringLiteral("BOTH READY"),
+                                TextUntilConfig{
+                                    .threshold = 0.25f,
+                                    .interval = 0.12f,
+                                    .timeout = 8,
+                                    .boxThreshold = 0.25f,
+                                    .region = StageRegion,
+                                }
+                            ),
+                        },
+                    .homing = false,
+                },
+                0.12f
+            )
+            ->end();
+    }
+
+    void runWaitPhases() {
+        std::make_unique<ImageClicker>(
+            MarkerA,
+            ImageInitConfig{
+                .threshold = 0.98f,
+                .timeout = 12,
+                .region = StageRegion,
+            }
+        )
+            ->click(
+                ImageRunConfig{
+                    .startWait = 0.6f,
+                    .finishUntilList =
+                        {
+                            new Image(
+                                MarkerB,
+                                ImageUntilConfig{
+                                    .threshold = 0.98f,
+                                    .interval = 0.12f,
+                                    .timeout = 8,
+                                    .region = StageRegion,
+                                }
+                            ),
+                        },
+                    .finishWait = 0.6f,
+                    .homing = true,
+                },
+                0.1f
+            )
+            ->click(
+                ImageRunConfig{
+                    .finishUntilList =
+                        {
+                            new Image(
+                                MarkerC,
+                                ImageUntilConfig{
+                                    .threshold = 0.98f,
+                                    .interval = 0.12f,
+                                    .timeout = 8,
+                                    .region = StageRegion,
+                                }
+                            ),
+                        },
+                    .homing = false,
+                },
+                0.1f
+            )
+            ->end();
+    }
+
 } // namespace
 
 const std::vector<TestCase>& testCases() {
@@ -916,7 +1273,7 @@ const std::vector<TestCase>& testCases() {
             "等待文字消失",
             "UNTIL",
             "Text(reverse)",
-            "PROCESSING",
+            "CONFIRM",
             "ABSENCE PASS",
             "文字消失后继续执行动作。"},
         {13,
@@ -976,55 +1333,180 @@ const std::vector<TestCase>& testCases() {
             "A → CONTINUE → C",
             "WORKFLOW COMPLETE",
             "验证原始链式 API 跨匹配类型传播。"},
+        {21,
+            "optional-untils",
+            "可选 Until 一次检查",
+            "UNTIL",
+            "IfImage / IfText",
+            "4 种 If* 条件均不命中",
+            "不阻塞并继续点击",
+            "验证 IfImage、IfAnyImage、IfText 和 IfAnyText 只检查一次。"},
+        {22,
+            "text-match-modes",
+            "文字匹配模式链",
+            "TEXT",
+            "REGEX → FUZZY → EXACT",
+            "ORDER-2048 → CONFIRM",
+            "MATCH MODES PASS",
+            "在同一条文字链中验证正则、模糊和精确匹配。"},
+        {23,
+            "ordered-selector",
+            "有序随机选择器",
+            "IMAGE",
+            "orderedRandomSelector",
+            "4 个同图目标",
+            "只选择最右 2 个",
+            "先按 X 中心降序排序，再在前两个结果中随机选择。"},
+        {24,
+            "click-anchor-offset",
+            "点击锚点与偏移",
+            "ACTION",
+            "Click::LEFT + offset",
+            "marker-a 左侧锚点",
+            "相对坐标 (12, 24)",
+            "验证 Segment 锚点和 offset 会合成正确的客户区点击坐标。"},
+        {25,
+            "reverse-drag",
+            "反向纵向拖动",
+            "ACTION",
+            "drag(reverse=true)",
+            "底部 marker-a",
+            "向上进入投放区",
+            "验证反向拖动、重新匹配与 runUntil 终止。"},
+        {26,
+            "upward-scroll",
+            "滚轮向上单次滚动",
+            "ACTION",
+            "scroll(delta > 0)",
+            "初始位于底部",
+            "SCROLL UP COMPLETE",
+            "验证正 delta、无 runUntil 时只滚动一次以及 finishUntil 等待。"},
+        {27,
+            "multiple-until-and",
+            "多条件 AND 终止",
+            "UNTIL",
+            "runUntilList AND",
+            "Image + Text",
+            "第三次点击后同时满足",
+            "所有 runUntil 必须在同一轮满足才能停止循环。"},
+        {28,
+            "wait-phases",
+            "执行阶段等待与归位",
+            "LIFECYCLE",
+            "startWait / finishWait / homing",
+            "两阶段延迟点击",
+            "WAIT PHASES PASS",
+            "验证动作前等待、后置条件前等待与鼠标归位流程。"},
     };
     return cases;
 }
 
-void runTestCase(
-    const int id
-) {
-    switch (id) {
-        case 1:
-            return runStaticImage();
-        case 2:
-            return runImageSelector();
-        case 3:
-            return runAnyImage();
-        case 4:
-            return runDelayedImage();
-        case 5:
-            return runDisappearingImage();
-        case 6:
-            return runStableImage();
-        case 7:
-            return runImageRegion();
-        case 8:
-            return runImageThreshold();
-        case 9:
-            return runStaticText();
-        case 10:
-            return runAnyText();
-        case 11:
-            return runDelayedText();
-        case 12:
-            return runDisappearingText();
-        case 13:
-            return runStableText();
-        case 14:
-            return runTextRegion();
-        case 15:
-            return runPreviousRelation();
-        case 16:
-            return runRepeatClick();
-        case 17:
-            return runDrag();
-        case 18:
-            return runScroll();
-        case 19:
-            return runHiddenLayer();
-        case 20:
-            return runMixedWorkflow();
-        default:
-            throw std::out_of_range("未知浏览器测试用例: " + std::to_string(id));
+namespace {
+
+    const TestCase& requireTestCase(
+        const int id
+    ) {
+        for (const TestCase& definition : testCases()) {
+            if (definition.id == id) return definition;
+        }
+        throw std::out_of_range("未知浏览器测试用例: " + std::to_string(id));
     }
+
+    QString jsonWorkflowPath(
+        const QString& workflowRoot,
+        const TestCase& definition
+    ) {
+        const QString fileName =
+            QStringLiteral("%1-%2.json").arg(definition.id, 2, 10, QLatin1Char('0')).arg(definition.slug);
+        return QDir(workflowRoot).filePath(fileName);
+    }
+
+    void runCppTestCase(
+        const int id
+    ) {
+        switch (id) {
+            case 1:
+                return runStaticImage();
+            case 2:
+                return runImageSelector();
+            case 3:
+                return runAnyImage();
+            case 4:
+                return runDelayedImage();
+            case 5:
+                return runDisappearingImage();
+            case 6:
+                return runStableImage();
+            case 7:
+                return runImageRegion();
+            case 8:
+                return runImageThreshold();
+            case 9:
+                return runStaticText();
+            case 10:
+                return runAnyText();
+            case 11:
+                return runDelayedText();
+            case 12:
+                return runDisappearingText();
+            case 13:
+                return runStableText();
+            case 14:
+                return runTextRegion();
+            case 15:
+                return runPreviousRelation();
+            case 16:
+                return runRepeatClick();
+            case 17:
+                return runDrag();
+            case 18:
+                return runScroll();
+            case 19:
+                return runHiddenLayer();
+            case 20:
+                return runMixedWorkflow();
+            case 21:
+                return runOptionalUntils();
+            case 22:
+                return runTextMatchModes();
+            case 23:
+                return runOrderedSelector();
+            case 24:
+                return runClickAnchorOffset();
+            case 25:
+                return runReverseDrag();
+            case 26:
+                return runUpwardScroll();
+            case 27:
+                return runMultipleUntilAnd();
+            case 28:
+                return runWaitPhases();
+            default:
+                throw std::out_of_range("未知浏览器测试用例: " + std::to_string(id));
+        }
+    }
+
+} // namespace
+
+void validateJsonTestCases(
+    const QString& workflowRoot
+) {
+    for (const TestCase& definition : testCases()) {
+        const Workflow workflow = parseWorkflowFile(jsonWorkflowPath(workflowRoot, definition));
+        if (workflow.stepCount() == 0) {
+            throw std::runtime_error("测试 JSON 工作流不能为空: " + definition.slug.toStdString());
+        }
+    }
+}
+
+void runTestCase(
+    const int id,
+    const TestWorkflowSource source,
+    const QString& workflowRoot
+) {
+    const TestCase& definition = requireTestCase(id);
+    if (source == TestWorkflowSource::CPP) return runCppTestCase(id);
+
+    std::unique_ptr<ClickerBase> last = parseWorkflowFile(jsonWorkflowPath(workflowRoot, definition)).run();
+    if (!last) throw std::runtime_error("JSON 工作流未返回最后一个 Clicker");
 }

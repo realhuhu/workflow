@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "name": "07 图片 ROI 裁剪",
+  "clicker": {
+    "kind": "IMAGE",
+    "target": "fixtures/marker-a.png",
+    "config": {
+      "threshold": 0.98,
+      "timeout": 12,
+      "region": {"x": 560, "y": 250, "width": 370, "height": 380}
+    }
+  },
+  "steps": [
+    {
+      "action": "click",
+      "runConfig": {
+        "finishUntilList": [
+          {
+            "type": "Image",
+            "target": "fixtures/marker-c.png",
+            "config": {
+              "threshold": 0.98,
+              "interval": 0.12,
+              "timeout": 8,
+              "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+            }
+          }
+        ],
+        "homing": false
+      },
+      "interval": 0.1
+    }
+  ]
+}

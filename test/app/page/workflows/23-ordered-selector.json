@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "name": "23 有序随机选择器",
+  "clicker": {
+    "kind": "IMAGE",
+    "target": "fixtures/marker-a.png",
+    "config": {
+      "threshold": 0.98,
+      "timeout": 12,
+      "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+    }
+  },
+  "steps": [
+    {
+      "action": "click",
+      "runConfig": {
+        "selector": {"type": "orderedRandom", "basis": "X_CENTER", "method": "MAX", "top": 2},
+        "finishUntilList": [
+          {
+            "type": "Image",
+            "target": "fixtures/marker-b.png",
+            "config": {
+              "threshold": 0.98,
+              "interval": 0.12,
+              "timeout": 8,
+              "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+            }
+          }
+        ],
+        "homing": false
+      },
+      "interval": 0.1
+    }
+  ]
+}

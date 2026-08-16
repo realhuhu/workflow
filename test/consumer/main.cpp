@@ -6,6 +6,11 @@ int main(
     const int argc,
     char**
 ) {
+    const Workflow parsed = parseWorkflow(QByteArrayLiteral(
+        R"({"version":1,"name":"consumer","clicker":{"kind":"IMAGE","target":"example.png"},"steps":[]})"
+    ));
+    if (parsed.name() != QStringLiteral("consumer") || parsed.stepCount() != 0) return 1;
+
     // Keep both concrete Clicker backends in the link graph while leaving the
     // package smoke test independent of a real HWND.
     if (argc > 1000) {

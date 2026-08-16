@@ -20,12 +20,12 @@ string(REGEX MATCHALL
         "${_test_cases_source}")
 list(LENGTH _test_chain_starts _test_chain_start_count)
 list(LENGTH _test_chain_ends _test_chain_end_count)
-if (NOT _test_chain_start_count EQUAL 20 OR
-    NOT _test_chain_end_count EQUAL 20)
+if (NOT _test_chain_start_count EQUAL 28 OR
+    NOT _test_chain_end_count EQUAL 28)
     message(FATAL_ERROR
             "Every test case must be one strict Clicker chain. "
             "Found ${_test_chain_start_count} starts and "
-            "${_test_chain_end_count} ends; expected 20 of each.")
+            "${_test_chain_end_count} ends; expected 28 of each.")
 endif()
 
 foreach (_forbidden_pattern
@@ -60,7 +60,15 @@ set(_expected_pages
         17-drag.html
         18-scroll.html
         19-hidden-layer.html
-        20-mixed-workflow.html)
+        20-mixed-workflow.html
+        21-optional-untils.html
+        22-text-match-modes.html
+        23-ordered-selector.html
+        24-click-anchor-offset.html
+        25-reverse-drag.html
+        26-upward-scroll.html
+        27-multiple-until-and.html
+        28-wait-phases.html)
 
 file(GLOB _actual_pages
         RELATIVE "${WORKFLOW_TEST_PAGE_ROOT}/cases"
@@ -68,9 +76,38 @@ file(GLOB _actual_pages
 list(SORT _actual_pages)
 if (NOT _actual_pages STREQUAL _expected_pages)
     message(FATAL_ERROR
-            "Test pages differ from the required 20-page contract.\n"
+            "Test pages differ from the required 28-page contract.\n"
             "Expected: ${_expected_pages}\nActual: ${_actual_pages}")
 endif()
+
+set(_expected_workflows)
+foreach (_page IN LISTS _expected_pages)
+    string(REPLACE ".html" ".json" _workflow "${_page}")
+    list(APPEND _expected_workflows "${_workflow}")
+endforeach()
+file(GLOB _actual_workflows
+        RELATIVE "${WORKFLOW_TEST_PAGE_ROOT}/workflows"
+        "${WORKFLOW_TEST_PAGE_ROOT}/workflows/*.json")
+list(SORT _actual_workflows)
+if (NOT _actual_workflows STREQUAL _expected_workflows)
+    message(FATAL_ERROR
+            "JSON workflows differ from the required 28-case contract.\n"
+            "Expected: ${_expected_workflows}\nActual: ${_actual_workflows}")
+endif()
+
+foreach (_workflow IN LISTS _expected_workflows)
+    file(READ "${WORKFLOW_TEST_PAGE_ROOT}/workflows/${_workflow}" _json)
+    foreach (_required_marker
+            "\"version\""
+            "\"name\""
+            "\"clicker\""
+            "\"steps\"")
+        string(FIND "${_json}" "${_required_marker}" _marker)
+        if (_marker EQUAL -1)
+            message(FATAL_ERROR "Invalid JSON workflow ${_workflow}: missing ${_required_marker}")
+        endif()
+    endforeach()
+endforeach()
 
 foreach (_page IN LISTS _expected_pages)
     file(READ "${WORKFLOW_TEST_PAGE_ROOT}/cases/${_page}" _html)
@@ -96,8 +133,8 @@ endforeach()
 file(READ "${WORKFLOW_TEST_PAGE_ROOT}/assets/catalog.js" _catalog)
 string(REGEX MATCHALL "id: [0-9]+" _catalog_ids "${_catalog}")
 list(LENGTH _catalog_ids _catalog_count)
-if (NOT _catalog_count EQUAL 20)
-    message(FATAL_ERROR "The test catalog must contain exactly 20 cases; found ${_catalog_count}")
+if (NOT _catalog_count EQUAL 28)
+    message(FATAL_ERROR "The test catalog must contain exactly 28 cases; found ${_catalog_count}")
 endif()
 
 file(READ "${WORKFLOW_TEST_PAGE_ROOT}/assets/case.js" _runtime)
@@ -109,4 +146,4 @@ foreach (_page IN LISTS _expected_pages)
     endif()
 endforeach()
 
-message(STATUS "Validated 20 deterministic test pages")
+message(STATUS "Validated 28 deterministic test pages and JSON workflows")
