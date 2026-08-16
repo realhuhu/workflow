@@ -1396,6 +1396,57 @@ namespace {
             ->end();
     }
 
+    void runScaledImage() {
+        std::make_unique<ImageClicker>(
+            MarkerA,
+            ImageInitConfig{
+                .threshold = 0.95f,
+                .timeout = 12,
+                .region = StageRegion,
+                .scales = {1.25f},
+            }
+        )
+            ->click(
+                ImageRunConfig{
+                    .finishUntilList =
+                        {
+                            new Image(
+                                MarkerA,
+                                ImageUntilConfig{
+                                    .threshold = 0.95f,
+                                    .interval = 0.12f,
+                                    .timeout = 8,
+                                    .region = StageRegion,
+                                    .scales = {1.5f},
+                                }
+                            ),
+                        },
+                    .homing = false,
+                },
+                0.1f
+            )
+            ->click(
+                ImageRunConfig{
+                    .finishUntilList =
+                        {
+                            new Image(
+                                MarkerB,
+                                ImageUntilConfig{
+                                    .threshold = 0.98f,
+                                    .interval = 0.12f,
+                                    .timeout = 8,
+                                    .region = StageRegion,
+                                    .scales = {1.0f},
+                                }
+                            ),
+                        },
+                    .homing = false,
+                },
+                0.1f
+            )
+            ->end();
+    }
+
 } // namespace
 
 const std::vector<TestCase>& testCases() {
@@ -1634,6 +1685,14 @@ const std::vector<TestCase>& testCases() {
             "BRANCH C | BRANCH B",
             "BRANCH C → Image",
             "文字分支执行后收敛到 ImageClicker，再继续相同主链。"},
+        {32,
+            "scaled-image",
+            "多尺度图片匹配",
+            "IMAGE",
+            "ImageInitConfig::scales + ImageUntilConfig::scales",
+            "100% marker-a.png",
+            "125% → 150%",
+            "只提供原始模板，由 config 指定两种显示缩放并返回实际尺寸 Segment。"},
     };
     return cases;
 }
@@ -1724,6 +1783,8 @@ namespace {
                 return runBranchAnyImage();
             case 31:
                 return runBranchIfAnyText();
+            case 32:
+                return runScaledImage();
             default:
                 throw std::out_of_range("未知浏览器测试用例: " + std::to_string(id));
         }

@@ -4,6 +4,13 @@
 
 ## Unreleased
 
+## 0.2.2
+
+- 图片模板匹配默认支持 100%、125%、150%、175% 和 200% 标准显示缩放；`ImageInitConfig`、
+  `ImageUntilConfig` 和 JSON 均可通过 `scales` 限定实际尝试的比例。只需维护 100% 模板，命中 Segment
+  会返回缩放后的实际客户区坐标与尺寸，并对同一目标的跨尺度结果执行去重。
+- Browser 测试扩展为 32 个页面、64 组 C++/JSON 流程，新增 125%→150% 配置化缩放匹配用例。
+
 ## 0.2.1
 
 - 增加 `ClickerBase::branch()` 链式分支 API；支持 `If`、`Any`、`IfAny` 图片/文字条件按实际命中的 target

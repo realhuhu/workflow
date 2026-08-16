@@ -130,6 +130,32 @@ namespace {
         return static_cast<float>(value);
     }
 
+    std::vector<float> imageScalesValue(
+        const QJsonObject& object,
+        const QString& key,
+        const QString& path,
+        const std::vector<float>& defaultValue
+    ) {
+        const auto value = object.value(key);
+        if (value.isUndefined()) return defaultValue;
+        if (!value.isArray()) invalidJson(path + "." + key, "必须是数组");
+
+        const QJsonArray array = value.toArray();
+        if (array.isEmpty()) invalidJson(path + "." + key, "不能为空");
+        std::vector<float> result;
+        result.reserve(static_cast<std::size_t>(array.size()));
+        for (int index = 0; index < array.size(); ++index) {
+            const QJsonValue item = array[index];
+            const QString itemPath = QString("%1.%2[%3]").arg(path, key).arg(index);
+            if (!item.isDouble() || !std::isfinite(item.toDouble()) || item.toDouble() <= 0 ||
+                item.toDouble() > std::numeric_limits<float>::max()) {
+                invalidJson(itemPath, "必须是大于0的有限float数值");
+            }
+            result.push_back(static_cast<float>(item.toDouble()));
+        }
+        return result;
+    }
+
     int intValue(
         const QJsonObject& object,
         const QString& key,
@@ -403,13 +429,14 @@ namespace {
         const QJsonObject& object,
         const QString& path
     ) {
-        rejectUnknownKeys(object, {"threshold", "timeout", "wait", "mode", "region"}, path);
+        rejectUnknownKeys(object, {"threshold", "timeout", "wait", "mode", "region", "scales"}, path);
         ImageInitConfig result;
         result.threshold = floatValue(object, "threshold", path, 0.9f);
         result.timeout = floatValue(object, "timeout", path, 60);
         result.wait = floatValue(object, "wait", path, 0);
         result.mode = parseMode(stringValue(object, "mode", path, "GRAY"), path + ".mode");
         result.region = rectValue(object, "region", path);
+        result.scales = imageScalesValue(object, "scales", path, result.scales);
         if (result.timeout < 0 || result.wait < 0) invalidJson(path, "timeout和wait不能为负数");
         return result;
     }
@@ -441,7 +468,18 @@ namespace {
     ) {
         rejectUnknownKeys(
             object,
-            {"onPrevious", "mode", "threshold", "interval", "startWait", "finishWait", "timeout", "reverse", "region"},
+            {
+                "onPrevious",
+                "mode",
+                "threshold",
+                "interval",
+                "startWait",
+                "finishWait",
+                "timeout",
+                "reverse",
+                "region",
+                "scales",
+            },
             path
         );
         ImageUntilConfig result;
@@ -454,6 +492,7 @@ namespace {
         result.timeout = floatValue(object, "timeout", path, -1);
         result.reverse = boolValue(object, "reverse", path, false);
         result.region = rectValue(object, "region", path);
+        result.scales = imageScalesValue(object, "scales", path, result.scales);
         if (result.interval < 0 || result.startWait < 0 || result.finishWait < 0 || result.timeout < -1) {
             invalidJson(path, "interval/startWait/finishWait不能为负数，timeout只能为-1或非负数");
         }

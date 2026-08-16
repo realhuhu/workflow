@@ -17,6 +17,7 @@ struct ImageUntilConfig {
     float timeout = -1;
     bool reverse = false;
     QRect region{};
+    std::vector<float> scales{1.0f, 1.25f, 1.5f, 1.75f, 2.0f};
 };
 
 class ImageUntil : public Until {

@@ -61,7 +61,7 @@ std::vector<Segment> Image::scan(
     if (screen.empty()) {
         throw std::runtime_error("窗口截图失败: " + toString().toStdString());
     }
-    const auto matched = CV::findPositions(screen, target, config.threshold, config.mode, config.region);
+    const auto matched = CV::findPositions(screen, target, config.threshold, config.mode, config.region, config.scales);
     targetSegmentList = filter(matched, previous);
     return targetSegmentList;
 }
@@ -86,7 +86,8 @@ std::vector<Segment> AnyImage::scan(
     }
 
     for (const auto& currentTarget : targetList) {
-        const auto matched = CV::findPositions(screen, currentTarget, config.threshold, config.mode, config.region);
+        const auto matched =
+            CV::findPositions(screen, currentTarget, config.threshold, config.mode, config.region, config.scales);
         auto filtered = filter(matched, previous);
         if (filtered.empty()) continue;
         target = currentTarget;

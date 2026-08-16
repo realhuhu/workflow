@@ -9,7 +9,7 @@ get_filename_component(
         "${WORKFLOW_TEST_PAGE_ROOT}/.."
         ABSOLUTE)
 file(READ "${_test_app_root}/cases.cpp" _test_cases_source)
-set(_expected_case_count 31)
+set(_expected_case_count 32)
 
 string(REGEX MATCHALL
         "std::make_unique<(Image|Text)Clicker>"
@@ -72,7 +72,8 @@ set(_expected_pages
         28-wait-phases.html
         29-branch-if-none.html
         30-branch-any-image.html
-        31-branch-if-any-text.html)
+        31-branch-if-any-text.html
+        32-scaled-image.html)
 
 file(GLOB _actual_pages
         RELATIVE "${WORKFLOW_TEST_PAGE_ROOT}/cases"

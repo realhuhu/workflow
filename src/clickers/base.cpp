@@ -437,6 +437,7 @@ std::unique_ptr<ClickerBase> ClickerBase::_createNext(
                     .wait = 0,
                     .mode = imageUntil->config.mode,
                     .region = imageUntil->config.region,
+                    .scales = imageUntil->config.scales,
                 }
             );
         }

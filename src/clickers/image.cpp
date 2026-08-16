@@ -39,7 +39,7 @@ std::vector<Segment> ImageClicker::matchTarget() {
 
     const cv::Mat screen = CV::getScreen(env.hwnd, config.mode);
     if (screen.empty()) throw std::runtime_error("窗口截图失败");
-    targetSegmentList = CV::findPositions(screen, target, config.threshold, config.mode, config.region);
+    targetSegmentList = CV::findPositions(screen, target, config.threshold, config.mode, config.region, config.scales);
     return targetSegmentList;
 }
 

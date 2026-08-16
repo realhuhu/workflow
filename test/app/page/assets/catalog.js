@@ -32,7 +32,8 @@
         { id: 28, slug: "wait-phases", title: "执行阶段等待与归位", group: "LIFECYCLE", api: "startWait / finishWait / homing", summary: "覆盖动作前后等待与归位开关。" },
         { id: 29, slug: "branch-if-none", title: "If 未命中继续主链", group: "BRANCH", api: "branch + IfImage", summary: "未命中不调用分支，直接继续主链。" },
         { id: 30, slug: "branch-any-image", title: "AnyImage 目标分支", group: "BRANCH", api: "branch + AnyImage", summary: "根据 AnyImage 实际 target 选择子流程。" },
-        { id: 31, slug: "branch-if-any-text", title: "IfAnyText 跨类型分支", group: "BRANCH", api: "branch + IfAnyText", summary: "文字子流程收敛回图片主链。" }
+        { id: 31, slug: "branch-if-any-text", title: "IfAnyText 跨类型分支", group: "BRANCH", api: "branch + IfAnyText", summary: "文字子流程收敛回图片主链。" },
+        { id: 32, slug: "scaled-image", title: "多尺度图片匹配", group: "IMAGE", api: "ImageClicker + Image", summary: "通过 config 指定比例，用 100% 模板连续匹配 125% 和 150% 目标。" }
     ];
 
     window.workflowEnvironment = function () {

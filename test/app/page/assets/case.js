@@ -615,6 +615,21 @@
                     pass("TEXT TO IMAGE BRANCH");
                 });
             });
+        },
+
+        "scaled-image": function () {
+            var first = marker("marker-a", 250, 270, function () {
+                first.remove();
+                var second = marker("marker-a", 620, 250, function () {
+                    second.remove();
+                    marker("marker-b", 760, 520);
+                    pass("125% + 150% MATCHED");
+                });
+                second.style.width = "72px";
+                second.style.height = "72px";
+            });
+            first.style.width = "60px";
+            first.style.height = "60px";
         }
     };
 

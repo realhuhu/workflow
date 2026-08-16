@@ -49,7 +49,7 @@ src/
 ├── support/                   # OCR、日志、资源路径、停止与计时
 └── third_party/rapidocr/       # RapidOCR 第三方实现
 
-test/                          # 单元测试、消费验证、31 页可视化测试程序
+test/                          # 单元测试、消费验证、32 页可视化测试程序
 cmake/                         # CMake 安装、运行时部署、格式化和 Windows manifest
 tool/                          # CI 依赖安装、打包与 Windows 7 PE 导入审计
 .github/workflows/             # Windows 构建、测试、制品和标签发布
@@ -113,6 +113,7 @@ ImageClicker clicker(
         .wait = 0,
         .mode = Mode::GRAY,
         .region = QRect(0, 0, 900, 700),
+        .scales = {1.0f, 1.25f, 1.5f},
     }
 );
 ```
@@ -149,6 +150,7 @@ TextClicker 首次匹配时先截图，再裁剪 `region`，最后调用 OCR。�
 | | `wait` | `0` | 首次匹配前等待，秒 |
 | | `mode` | `GRAY` | 截图和模板匹配模式 |
 | | `region` | 空 | 模板匹配 ROI；空表示整个客户区 |
+| | `scales` | `{1, 1.25, 1.5, 1.75, 2}` | 按顺序尝试的模板缩放比例 |
 | `TextInitConfig` | `timeout` | `60` | 动作循环超时，秒 |
 | | `wait` | `0` | 首次匹配前等待，秒 |
 | | `mode` | `RGB` | OCR 截图模式 |
@@ -158,6 +160,11 @@ TextClicker 首次匹配时先截图，再裁剪 `region`，最后调用 OCR。�
 
 `resolvedRegion == nullopt` 表示尚未解析；`resolvedRegion` 有值但 `QRect` 为空表示真实空交集，必须跳过
 截图后的 OCR，不能退化成整窗识别。
+
+图片模板始终按 100% 显示比例制作。`ImageInitConfig::scales` 和 `ImageUntilConfig::scales` 指定要尝试的
+比例，例如 `{1.25f}` 只匹配 125%，`{1.0f, 1.25f, 1.5f}` 按该顺序匹配三档。默认覆盖 100%、125%、
+150%、175% 和 200%，使用线性插值生成临时候选，不需要保存多份图片。返回的 `Segment` 使用实际命中
+比例的宽高和客户区坐标；ROI 仍按当前截图的客户区坐标传入。某档近乎精确命中会直接返回。
 
 ## 动作与 RunConfig
 
@@ -262,7 +269,8 @@ std::unique_ptr<ClickerBase> last = workflow.run();
     "target": "login/start.png",
     "config": {
       "threshold": 0.92,
-      "mode": "GRAY"
+      "mode": "GRAY",
+      "scales": [1.0, 1.25, 1.5]
     }
   },
   "steps": [
@@ -318,11 +326,11 @@ std::unique_ptr<ClickerBase> last = workflow.run();
 
 v1 暂不解析通用循环；复杂循环仍可保留在 C++。
 
-`workflow-test` 的右侧面板可在 C++ 链式 API 和 JSON 工作流之间切换；31 个可视化用例
-均提供等价 JSON，用于对比两种执行入口。“运行全部 62 项”会自动逐页执行两种来源，失败项被记录
+`workflow-test` 的右侧面板可在 C++ 链式 API 和 JSON 工作流之间切换；32 个可视化用例
+均提供等价 JSON，用于对比两种执行入口。“运行全部 64 项”会自动逐页执行两种来源，失败项被记录
 后继续运行，并在最后输出汇总。
 
-命令行执行 `workflow-test.exe --run-all` 会显示同一个 Browser 窗口并自动运行全部 62 项，结束后向
+命令行执行 `workflow-test.exe --run-all` 会显示同一个 Browser 窗口并自动运行全部 64 项，结束后向
 标准输出打印逐项结果与机器可读的 `SUMMARY`，全通过返回 `0`，否则返回 `1`。也可以使用
 `--cases "1,3,8-12" --source cpp|json|all` 只运行指定页面与流程来源。配置
 `WORKFLOW_REGISTER_BROWSER_TEST=ON` 后会注册 CTest 目标 `workflow.browser`；它需要可见的交互式 Windows
@@ -354,6 +362,7 @@ v1 暂不解析通用循环；复杂循环仍可保留在 C++。
 | `timeout` | `-1` | 条件超时；负值继承 Clicker |
 | `reverse` | `false` | 等待图片消失 |
 | `region` | 空 | 模板匹配 ROI |
+| `scales` | `[1, 1.25, 1.5, 1.75, 2]` | 按顺序尝试的模板缩放比例 |
 
 ### TextUntilConfig
 

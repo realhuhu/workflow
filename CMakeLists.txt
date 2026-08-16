@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(workflow VERSION 0.2.1 LANGUAGES CXX)
+project(workflow VERSION 0.2.2 LANGUAGES CXX)
 
 if (NOT WIN32)
     message(FATAL_ERROR "workflow currently supports Windows only")

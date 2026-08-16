@@ -1683,6 +1683,22 @@ namespace {
         badVersion["version"] = 2;
         EXPECT_THROWS(std::invalid_argument, parseWorkflow(badVersion));
 
+        auto emptyScales = valid;
+        auto imageClicker = emptyScales["clicker"].toObject();
+        auto imageConfig = imageClicker["config"].toObject();
+        imageConfig["scales"] = QJsonArray{};
+        imageClicker["config"] = imageConfig;
+        emptyScales["clicker"] = imageClicker;
+        EXPECT_THROWS(std::invalid_argument, parseWorkflow(emptyScales));
+
+        auto invalidScale = valid;
+        imageClicker = invalidScale["clicker"].toObject();
+        imageConfig = imageClicker["config"].toObject();
+        imageConfig["scales"] = QJsonArray{0};
+        imageClicker["config"] = imageConfig;
+        invalidScale["clicker"] = imageClicker;
+        EXPECT_THROWS(std::invalid_argument, parseWorkflow(invalidScale));
+
         auto textSelector = valid;
         auto clicker = textSelector["clicker"].toObject();
         clicker["kind"] = "TEXT";
@@ -2090,6 +2106,73 @@ namespace {
         EXPECT_EQ(inRoi.front().y, 30);
     }
 
+    void testImageTemplateMatchingUsesConfiguredDisplayScales() {
+        QTemporaryDir directory;
+        EXPECT_TRUE(directory.isValid());
+
+        cv::Mat templ(24, 32, CV_8UC3);
+        cv::RNG templateRng(0x42817);
+        templateRng.fill(templ, cv::RNG::UNIFORM, 0, 256);
+        const QString path = writePng(templ, directory.filePath("template.png"));
+        const std::vector<float> scales{1.0f, 1.25f, 1.3f, 1.5f, 1.75f, 2.0f};
+
+        for (const Mode mode : {Mode::GRAY, Mode::RGB}) {
+            for (const float scale : scales) {
+                cv::Mat source(180, 240, CV_8UC3);
+                cv::RNG sourceRng(static_cast<uint64>(scale * 1000) + (mode == Mode::GRAY ? 1 : 2));
+                sourceRng.fill(source, cv::RNG::UNIFORM, 0, 60);
+
+                cv::Mat scaled;
+                const cv::Size scaledSize(
+                    cvRound(static_cast<double>(templ.cols) * scale),
+                    cvRound(static_cast<double>(templ.rows) * scale)
+                );
+                cv::resize(templ, scaled, scaledSize, 0, 0, cv::INTER_LINEAR);
+                const int x = 71;
+                const int y = 53;
+                scaled.copyTo(source(cv::Rect(x, y, scaled.cols, scaled.rows)));
+
+                const auto hits = CV::findPositions(
+                    source,
+                    path,
+                    0.995f,
+                    mode,
+                    QRect(x - 5, y - 5, scaled.cols + 10, scaled.rows + 10),
+                    std::vector<float>{scale}
+                );
+                EXPECT_EQ(hits.size(), size_t(1));
+                EXPECT_EQ(hits.front().x, x);
+                EXPECT_EQ(hits.front().y, y);
+                EXPECT_EQ(hits.front().width, scaled.cols);
+                EXPECT_EQ(hits.front().height, scaled.rows);
+                EXPECT_TRUE(hits.front().score >= 0.995f);
+
+                if (scale == 1.5f) {
+                    const auto wrongScale = CV::findPositions(
+                        source,
+                        path,
+                        0.995f,
+                        mode,
+                        QRect(x - 5, y - 5, scaled.cols + 10, scaled.rows + 10),
+                        std::vector<float>{1.0f}
+                    );
+                    EXPECT_TRUE(wrongScale.empty());
+                }
+            }
+        }
+
+        EXPECT_EQ(ImageInitConfig{}.scales.size(), std::size_t(5));
+        EXPECT_EQ(ImageUntilConfig{}.scales.size(), std::size_t(5));
+        EXPECT_THROWS(
+            std::invalid_argument,
+            CV::findPositions(templ, path, 0.9f, Mode::GRAY, {}, std::vector<float>{})
+        );
+        EXPECT_THROWS(
+            std::invalid_argument,
+            CV::findPositions(templ, path, 0.9f, Mode::GRAY, {}, std::vector<float>{0})
+        );
+    }
+
     void testSelectorsAndPreviousFilter() {
         const std::vector<Segment> candidates{
             Segment(10, 45, 10, 10, 0.2f),
@@ -2178,7 +2261,7 @@ namespace {
     void testBrowserJsonWorkflowsAllParse() {
         const QDir root(QString::fromUtf8(WORKFLOW_TEST_WORKFLOW_ROOT));
         const QStringList files = root.entryList({QStringLiteral("*.json")}, QDir::Files, QDir::Name);
-        EXPECT_EQ(files.size(), 31);
+        EXPECT_EQ(files.size(), 32);
 
         for (const QString& file : files) {
             const Workflow workflow = parseWorkflowFile(root.filePath(file));
@@ -2232,6 +2315,7 @@ int main(
         {"all browser JSON workflows parse with the production parser", testBrowserJsonWorkflowsAllParse},
         {"image matching honors ROI global coordinates and NMS",
             testImageTemplateMatchingUsesRoiGlobalCoordinatesAndNms},
+        {"image matching uses configured display scales", testImageTemplateMatchingUsesConfiguredDisplayScales},
         {"selectors and Previous filter", testSelectorsAndPreviousFilter},
         {"bundled RapidOCR models load and run", testBundledOcrEngineLoadsAndRuns},
     };
