@@ -1087,7 +1087,7 @@ namespace {
                     .finishWait = 0.5f,
                     .homing = false,
                 },
-                WheelDelta * 20,
+                WheelDelta * 100,
                 0.15f
             )
             ->end();
@@ -1172,6 +1172,219 @@ namespace {
                                     .threshold = 0.98f,
                                     .interval = 0.12f,
                                     .timeout = 8,
+                                    .region = StageRegion,
+                                }
+                            ),
+                        },
+                    .homing = false,
+                },
+                0.1f
+            )
+            ->end();
+    }
+
+    void runBranchIfNone() {
+        std::make_unique<ImageClicker>(
+            MarkerA,
+            ImageInitConfig{
+                .threshold = 0.98f,
+                .timeout = 12,
+                .region = StageRegion,
+            }
+        )
+            ->branch(
+                std::make_unique<IfImage>(
+                    MarkerC,
+                    ImageUntilConfig{
+                        .threshold = 0.98f,
+                        .region = StageRegion,
+                    }
+                ),
+                BranchMap{
+                    {MarkerC, [](std::unique_ptr<ClickerBase> current) { return current; }},
+                }
+            )
+            ->click(
+                ImageRunConfig{
+                    .finishUntilList =
+                        {
+                            new Image(
+                                MarkerB,
+                                ImageUntilConfig{
+                                    .threshold = 0.98f,
+                                    .interval = 0.12f,
+                                    .timeout = 8,
+                                    .region = StageRegion,
+                                }
+                            ),
+                        },
+                    .homing = false,
+                },
+                0.1f
+            )
+            ->end();
+    }
+
+    void runBranchAnyImage() {
+        std::make_unique<ImageClicker>(
+            MarkerC,
+            ImageInitConfig{
+                .threshold = 0.98f,
+                .timeout = 12,
+                .region = StageRegion,
+            }
+        )
+            ->branch(
+                std::make_unique<AnyImage>(
+                    std::vector<QString>{MarkerC, MarkerB},
+                    ImageUntilConfig{
+                        .threshold = 0.98f,
+                        .interval = 0.12f,
+                        .timeout = 8,
+                        .region = StageRegion,
+                    }
+                ),
+                BranchMap{
+                    {MarkerC,
+                        [](std::unique_ptr<ClickerBase> current) {
+                            return current->click(
+                                ImageRunConfig{
+                                    .finishUntilList =
+                                        {
+                                            new Image(
+                                                MarkerA,
+                                                ImageUntilConfig{
+                                                    .threshold = 0.98f,
+                                                    .interval = 0.12f,
+                                                    .timeout = 8,
+                                                    .region = StageRegion,
+                                                }
+                                            ),
+                                        },
+                                    .homing = false,
+                                },
+                                0.1f
+                            );
+                        }},
+                    {MarkerB,
+                        [](std::unique_ptr<ClickerBase> current) {
+                            return current->click(
+                                ImageRunConfig{
+                                    .finishUntilList =
+                                        {
+                                            new Image(
+                                                MarkerA,
+                                                ImageUntilConfig{
+                                                    .threshold = 0.98f,
+                                                    .interval = 0.12f,
+                                                    .timeout = 8,
+                                                    .region = StageRegion,
+                                                }
+                                            ),
+                                        },
+                                    .homing = false,
+                                },
+                                0.1f
+                            );
+                        }},
+                }
+            )
+            ->click(
+                ImageRunConfig{
+                    .finishUntilList =
+                        {
+                            new Text(
+                                QStringLiteral("BRANCH ANY COMPLETE"),
+                                TextUntilConfig{
+                                    .threshold = 0.25f,
+                                    .interval = 0.12f,
+                                    .timeout = 8,
+                                    .boxThreshold = 0.25f,
+                                    .region = StageRegion,
+                                }
+                            ),
+                        },
+                    .homing = false,
+                },
+                0.1f
+            )
+            ->end();
+    }
+
+    void runBranchIfAnyText() {
+        std::make_unique<ImageClicker>(
+            MarkerA,
+            ImageInitConfig{
+                .threshold = 0.98f,
+                .timeout = 12,
+                .region = StageRegion,
+            }
+        )
+            ->branch(
+                std::make_unique<IfAnyText>(
+                    std::vector<QString>{QStringLiteral("BRANCH C"), QStringLiteral("BRANCH B")},
+                    TextUntilConfig{
+                        .threshold = 0.25f,
+                        .boxThreshold = 0.25f,
+                        .region = StageRegion,
+                    }
+                ),
+                BranchMap{
+                    {QStringLiteral("BRANCH C"),
+                        [](std::unique_ptr<ClickerBase> current) {
+                            return current->click(
+                                TextRunConfig{
+                                    .finishUntilList =
+                                        {
+                                            new Image(
+                                                MarkerB,
+                                                ImageUntilConfig{
+                                                    .threshold = 0.98f,
+                                                    .interval = 0.12f,
+                                                    .timeout = 8,
+                                                    .region = StageRegion,
+                                                }
+                                            ),
+                                        },
+                                    .homing = false,
+                                },
+                                0.1f
+                            );
+                        }},
+                    {QStringLiteral("BRANCH B"),
+                        [](std::unique_ptr<ClickerBase> current) {
+                            return current->click(
+                                TextRunConfig{
+                                    .finishUntilList =
+                                        {
+                                            new Image(
+                                                MarkerB,
+                                                ImageUntilConfig{
+                                                    .threshold = 0.98f,
+                                                    .interval = 0.12f,
+                                                    .timeout = 8,
+                                                    .region = StageRegion,
+                                                }
+                                            ),
+                                        },
+                                    .homing = false,
+                                },
+                                0.1f
+                            );
+                        }},
+                }
+            )
+            ->click(
+                ImageRunConfig{
+                    .finishUntilList =
+                        {
+                            new Text(
+                                QStringLiteral("BRANCH TEXT COMPLETE"),
+                                TextUntilConfig{
+                                    .threshold = 0.25f,
+                                    .interval = 0.12f,
+                                    .timeout = 8,
+                                    .boxThreshold = 0.25f,
                                     .region = StageRegion,
                                 }
                             ),
@@ -1397,6 +1610,30 @@ const std::vector<TestCase>& testCases() {
             "两阶段延迟点击",
             "WAIT PHASES PASS",
             "验证动作前等待、后置条件前等待与鼠标归位流程。"},
+        {29,
+            "branch-if-none",
+            "If 未命中继续主链",
+            "BRANCH",
+            "branch + IfImage",
+            "marker-c absent",
+            "main chain continues",
+            "IfImage 返回 None 时不进入处理函数，继续 branch 后的链。"},
+        {30,
+            "branch-any-image",
+            "AnyImage 目标分支",
+            "BRANCH",
+            "branch + AnyImage",
+            "marker-c | marker-b",
+            "marker-c branch",
+            "按 AnyImage 实际命中的 target 选择对应子流程并回到图片主链。"},
+        {31,
+            "branch-if-any-text",
+            "IfAnyText 跨类型分支",
+            "BRANCH",
+            "branch + IfAnyText",
+            "BRANCH C | BRANCH B",
+            "BRANCH C → Image",
+            "文字分支执行后收敛到 ImageClicker，再继续相同主链。"},
     };
     return cases;
 }
@@ -1481,6 +1718,12 @@ namespace {
                 return runMultipleUntilAnd();
             case 28:
                 return runWaitPhases();
+            case 29:
+                return runBranchIfNone();
+            case 30:
+                return runBranchAnyImage();
+            case 31:
+                return runBranchIfAnyText();
             default:
                 throw std::out_of_range("未知浏览器测试用例: " + std::to_string(id));
         }

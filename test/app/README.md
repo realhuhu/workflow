@@ -1,11 +1,11 @@
 # Workflow 可视化测试程序
 
 这是一个完全离线的 Qt WebEngine 可视化测试应用。左侧是固定为 `1000 × 800` 的网页客户区，右侧是
-28 个测试用例、运行控制和支持自动换行的框架日志。“流程来源”可以在 `C++ 链式 API` 和 `JSON 工作流`
+31 个测试用例、运行控制和支持自动换行的框架日志。“流程来源”可以在 `C++ 链式 API` 和 `JSON 工作流`
 之间切换；两种模式共用同一页面、参数和结果断言。点击“运行当前用例”后，应用会在工作线程中创建
 真实的 `ImageClicker` / `TextClicker`，并把左侧 `QWebEngineView::winId()` 作为目标 HWND。
 
-“运行全部 56 项”会按用例编号依次执行每个页面的 C++ 和 JSON 版本。每一项都会重新加载页面、
+“运行全部 62 项”会按用例编号依次执行每个页面的 C++ 和 JSON 版本。每一项都会重新加载页面、
 校验 DPI、重置 fixture 并独立记录 PASS/FAIL；单项失败不会中断后续项目，结束后日志给出通过、失败
 和总数。批量运行期间“停止”会终止当前工作流并取消剩余项目。
 
@@ -19,9 +19,44 @@ cmake --build build/project --config Release --target workflow_test
 & "build/project/test/app/Release/workflow-test.exe"
 ```
 
+命令行自动模式仍会显示 Browser 窗口，页面和 OCR 就绪后自动运行全部 62 项，最后把每项结果与汇总
+写到标准输出并按结果退出：全通过返回 `0`，任一失败、停止或初始化失败返回 `1`。
+
+```powershell
+$run = Start-Process `
+    -FilePath "build/project/test/app/Release/workflow-test.exe" `
+    -ArgumentList "--run-all" `
+    -NoNewWindow `
+    -Wait `
+    -PassThru
+$run.ExitCode
+```
+
+可用 `--cases` 选择页面编号（支持逗号和闭区间），并用 `--source` 选择 C++、JSON 或两者。
+只要传入任一筛选参数就会自动运行，不必同时传 `--run-all`：
+
+```powershell
+# 第 1、3、8~12、29~31 页，只运行 C++ 链式 API，共 10 项
+& "build/project/test/app/Release/workflow-test.exe" --cases "1,3,8-12,29-31" --source cpp
+
+# 第 29~31 页，只运行 JSON，共 3 项
+& "build/project/test/app/Release/workflow-test.exe" --cases "29-31" --source json
+
+# 全部页面的两种实现，与 --run-all 等价
+& "build/project/test/app/Release/workflow-test.exe" --cases all --source all
+```
+
+`--source` 可取 `cpp`、`json`、`all`，默认 `all`。重复编号会自动去重；非法编号、倒序范围或非法
+来源返回退出码 `2`，不会开始测试。
+
+输出位于 `WORKFLOW_TEST_RESULTS_BEGIN` 和 `WORKFLOW_TEST_RESULTS_END` 之间。启用
+`WORKFLOW_BUILD_TESTS=ON` 和 `WORKFLOW_REGISTER_BROWSER_TEST=ON` 后，也可以通过
+`ctest -C Release -R workflow.browser --output-on-failure` 运行同一套端到端流程。该测试依赖可见的交互式
+Windows 桌面，因此普通构建和托管 CI 默认不注册。
+
 构建后会自动：
 
-- 把 `page/` 复制到可执行文件旁的 `test-page/`，其中 `workflows/` 保存 28 份 JSON 流程；
+- 把 `page/` 复制到可执行文件旁的 `test-page/`，其中 `workflows/` 保存 31 份 JSON 流程；
 - 使用 `workflow_stage_runtime()` 部署 OCR 模型、OpenCV、ONNX Runtime 和许可证；
 - 使用 `windeployqt` 部署 Qt WebEngine 进程、资源和 DLL；
 - 首次启动时生成四张无抗锯齿的 48 × 48 PNG 模板到
@@ -50,7 +85,7 @@ Windows 7 SP1 仍建议安装完整系统更新。Qt 采用动态链接，Qt LGP
 目标模板全部使用整数坐标、原生尺寸 PNG 和无抗锯齿绘制。OCR 目标使用高对比、大字号文本；OCR
 测试验证语义匹配和裁剪坐标，不要求不同 Windows 字体栅格化结果逐像素一致。
 
-## 28 个二级页面
+## 31 个二级页面
 
 | 编号 | 页面 | 框架能力 | 成功效果 |
 | --- | --- | --- | --- |
@@ -82,6 +117,9 @@ Windows 7 SP1 仍建议安装完整系统更新。Qt 采用动态链接，Qt LGP
 | 26 | `upward-scroll` | 正滚轮 delta + finish Until | 单次向上滚动到顶部 |
 | 27 | `multiple-until-and` | 多个 `runUntil` 的 AND | 图片和文字同轮满足才停止 |
 | 28 | `wait-phases` | `startWait` / `finishWait` / `homing` | 两个等待阶段均生效 |
+| 29 | `branch-if-none` | `branch` + `IfImage` | 未命中时继续主链 |
+| 30 | `branch-any-image` | `branch` + `AnyImage` | 按实际图片 target 选择子流程 |
+| 31 | `branch-if-any-text` | `branch` + `IfAnyText` | 文字分支收敛回图片主链 |
 
 浏览器页面只承担确定、可观察的端到端断言。`randomSelector` 的候选域约束、其余
 `Previous` 方位枚举、停止/超时边界和 Win32 消息参数等不适合页面稳定判定的分支，由
@@ -96,5 +134,5 @@ window.workflowFixture.state();       // 当前可视化状态
 ```
 
 CTest 中的 `workflow.pages` 会校验页面、JSON 流程、`data-case`、catalog 条目和对应
-renderer 一一对应。程序启动时还会用正式 `parseWorkflowFile()` 预解析全部 28 份 JSON，
+renderer 一一对应。程序启动时还会用正式 `parseWorkflowFile()` 预解析全部 31 份 JSON，
 任何 schema 错误都会立即报错。

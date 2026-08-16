@@ -67,6 +67,38 @@ std::unique_ptr<ClickerBase> ClickerBase::locate() {
     return locateResolved(defaultRunConfig());
 }
 
+std::unique_ptr<ClickerBase> ClickerBase::branch(
+    std::unique_ptr<Until> condition,
+    const BranchMap& branches
+) {
+    if (!condition) throw std::invalid_argument("branch条件不能为空");
+    if (condition->isReversed()) {
+        throw std::invalid_argument("branch不支持reverse=true：目标未命中时没有可分派的target");
+    }
+
+    auto current = clone();
+    const bool matched = condition->loop(previousSegment, timeout());
+    if (stopped(env.stopFlag)) return current;
+    if (!matched) {
+        logMessage("分支未匹配，继续主链");
+        return current;
+    }
+
+    const QString selectedTarget = condition->target;
+    const auto branch = branches.find(selectedTarget);
+    if (branch == branches.end()) {
+        throw std::invalid_argument("分支未配置目标处理函数: " + selectedTarget.toStdString());
+    }
+
+    std::vector<std::unique_ptr<Until>> matchedConditions;
+    matchedConditions.push_back(std::move(condition));
+    auto matchedClicker = _createNext({}, matchedConditions);
+    logMessage("进入分支: " + selectedTarget);
+    auto result = branch->second(std::move(matchedClicker));
+    if (!result) throw std::runtime_error("分支处理函数不能返回空Clicker");
+    return result;
+}
+
 std::unique_ptr<ClickerBase> ClickerBase::locateResolved(
     ResolvedRunConfig config
 ) {

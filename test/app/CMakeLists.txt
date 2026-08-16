@@ -45,6 +45,14 @@ add_custom_command(TARGET workflow_test POST_BUILD
 
 set_target_properties(workflow_test PROPERTIES OUTPUT_NAME "workflow-test")
 
+if (WORKFLOW_BUILD_TESTS AND WORKFLOW_REGISTER_BROWSER_TEST)
+    add_test(NAME workflow.browser COMMAND $<TARGET_FILE:workflow_test> --run-all)
+    set_tests_properties(workflow.browser PROPERTIES
+            WORKING_DIRECTORY "$<TARGET_FILE_DIR:workflow_test>"
+            RUN_SERIAL TRUE
+            TIMEOUT 1200)
+endif()
+
 if (PROJECT_IS_TOP_LEVEL)
     find_program(WORKFLOW_TEST_POWERSHELL_EXECUTABLE
             NAMES pwsh powershell

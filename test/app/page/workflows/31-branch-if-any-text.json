@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "name": "31 IfAnyText 跨类型分支",
+  "clicker": {
+    "kind": "IMAGE",
+    "target": "fixtures/marker-a.png",
+    "config": {
+      "threshold": 0.98,
+      "timeout": 12,
+      "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+    }
+  },
+  "steps": [
+    {
+      "action": "branch",
+      "condition": {
+        "type": "IfAnyText",
+        "targets": ["BRANCH C", "BRANCH B"],
+        "config": {
+          "threshold": 0.25,
+          "boxThreshold": 0.25,
+          "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+        }
+      },
+      "branches": {
+        "BRANCH C": [
+          {
+            "action": "click",
+            "runConfig": {
+              "finishUntilList": [
+                {
+                  "type": "Image",
+                  "target": "fixtures/marker-b.png",
+                  "config": {
+                    "threshold": 0.98,
+                    "interval": 0.12,
+                    "timeout": 8,
+                    "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+                  }
+                }
+              ],
+              "homing": false
+            },
+            "interval": 0.1
+          }
+        ],
+        "BRANCH B": [
+          {
+            "action": "click",
+            "runConfig": {
+              "finishUntilList": [
+                {
+                  "type": "Image",
+                  "target": "fixtures/marker-b.png",
+                  "config": {
+                    "threshold": 0.98,
+                    "interval": 0.12,
+                    "timeout": 8,
+                    "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+                  }
+                }
+              ],
+              "homing": false
+            },
+            "interval": 0.1
+          }
+        ]
+      }
+    },
+    {
+      "action": "click",
+      "runConfig": {
+        "finishUntilList": [
+          {
+            "type": "Text",
+            "target": "BRANCH TEXT COMPLETE",
+            "config": {
+              "threshold": 0.25,
+              "interval": 0.12,
+              "timeout": 8,
+              "boxThreshold": 0.25,
+              "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+            }
+          }
+        ],
+        "homing": false
+      },
+      "interval": 0.1
+    }
+  ]
+}

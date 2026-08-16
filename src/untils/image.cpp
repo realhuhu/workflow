@@ -137,13 +137,13 @@ IfImage::IfImage(
 ) : Image(target, config) {
 }
 
-void IfImage::loop(
+bool IfImage::loop(
     std::unique_ptr<Segment>& previous,
     float
 ) {
     sleep(env.stopFlag, config.startWait);
-    if (stopped(env.stopFlag)) return;
-    (void)fulfilled(previous);
+    if (stopped(env.stopFlag)) return false;
+    return fulfilled(previous);
 }
 
 QString IfImage::toString() const {
@@ -156,13 +156,13 @@ IfAnyImage::IfAnyImage(
 ) : AnyImage(targets, config) {
 }
 
-void IfAnyImage::loop(
+bool IfAnyImage::loop(
     std::unique_ptr<Segment>& previous,
     float
 ) {
     sleep(env.stopFlag, config.startWait);
-    if (stopped(env.stopFlag)) return;
-    (void)fulfilled(previous);
+    if (stopped(env.stopFlag)) return false;
+    return fulfilled(previous);
 }
 
 QString IfAnyImage::toString() const {

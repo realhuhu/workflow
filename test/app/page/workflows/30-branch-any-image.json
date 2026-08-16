@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "name": "30 AnyImage 目标分支",
+  "clicker": {
+    "kind": "IMAGE",
+    "target": "fixtures/marker-c.png",
+    "config": {
+      "threshold": 0.98,
+      "timeout": 12,
+      "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+    }
+  },
+  "steps": [
+    {
+      "action": "branch",
+      "condition": {
+        "type": "AnyImage",
+        "targets": ["fixtures/marker-c.png", "fixtures/marker-b.png"],
+        "config": {
+          "threshold": 0.98,
+          "interval": 0.12,
+          "timeout": 8,
+          "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+        }
+      },
+      "branches": {
+        "fixtures/marker-c.png": [
+          {
+            "action": "click",
+            "runConfig": {
+              "finishUntilList": [
+                {
+                  "type": "Image",
+                  "target": "fixtures/marker-a.png",
+                  "config": {
+                    "threshold": 0.98,
+                    "interval": 0.12,
+                    "timeout": 8,
+                    "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+                  }
+                }
+              ],
+              "homing": false
+            },
+            "interval": 0.1
+          }
+        ],
+        "fixtures/marker-b.png": [
+          {
+            "action": "click",
+            "runConfig": {
+              "finishUntilList": [
+                {
+                  "type": "Image",
+                  "target": "fixtures/marker-a.png",
+                  "config": {
+                    "threshold": 0.98,
+                    "interval": 0.12,
+                    "timeout": 8,
+                    "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+                  }
+                }
+              ],
+              "homing": false
+            },
+            "interval": 0.1
+          }
+        ]
+      }
+    },
+    {
+      "action": "click",
+      "runConfig": {
+        "finishUntilList": [
+          {
+            "type": "Text",
+            "target": "BRANCH ANY COMPLETE",
+            "config": {
+              "threshold": 0.25,
+              "interval": 0.12,
+              "timeout": 8,
+              "boxThreshold": 0.25,
+              "region": {"x": 20, "y": 120, "width": 960, "height": 660}
+            }
+          }
+        ],
+        "homing": false
+      },
+      "interval": 0.1
+    }
+  ]
+}

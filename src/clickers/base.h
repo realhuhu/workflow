@@ -2,6 +2,7 @@
 #define WORKFLOW_CLICKERS_BASE_H
 
 #include <functional>
+#include <map>
 #include <memory>
 #include <stdexcept>
 #include <utility>
@@ -12,6 +13,10 @@
 #include "matching/selector.h"
 
 class Until;
+class ClickerBase;
+
+using BranchFunction = std::function<std::unique_ptr<ClickerBase>(std::unique_ptr<ClickerBase>)>;
+using BranchMap = std::map<QString, BranchFunction>;
 
 template <typename RunConfig> struct RunConfigAdapter;
 
@@ -47,6 +52,8 @@ public:
     void _finish(float finishWait, const std::vector<std::unique_ptr<Until>>& finishUntilList);
 
     [[nodiscard]] virtual std::unique_ptr<ClickerBase> locate();
+
+    [[nodiscard]] std::unique_ptr<ClickerBase> branch(std::unique_ptr<Until> condition, const BranchMap& branches);
 
     template <typename RunConfig>
         requires requires(const RunConfig& config) {

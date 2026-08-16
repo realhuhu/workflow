@@ -193,13 +193,13 @@ IfText::IfText(
 ) : Text(target, std::move(config)) {
 }
 
-void IfText::loop(
+bool IfText::loop(
     std::unique_ptr<Segment>& previous,
     float
 ) {
     sleep(env.stopFlag, config.startWait);
-    if (stopped(env.stopFlag)) return;
-    (void)fulfilled(previous);
+    if (stopped(env.stopFlag)) return false;
+    return fulfilled(previous);
 }
 
 QString IfText::toString() const {
@@ -212,13 +212,13 @@ IfAnyText::IfAnyText(
 ) : AnyText(targets, std::move(config)) {
 }
 
-void IfAnyText::loop(
+bool IfAnyText::loop(
     std::unique_ptr<Segment>& previous,
     float
 ) {
     sleep(env.stopFlag, config.startWait);
-    if (stopped(env.stopFlag)) return;
-    (void)fulfilled(previous);
+    if (stopped(env.stopFlag)) return false;
+    return fulfilled(previous);
 }
 
 QString IfAnyText::toString() const {

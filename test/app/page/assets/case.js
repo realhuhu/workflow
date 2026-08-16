@@ -575,6 +575,46 @@
                     pass("WAIT PHASES PASS");
                 });
             });
+        },
+
+        "branch-if-none": function () {
+            marker("marker-a", 430, 270, function (event) {
+                event.currentTarget.remove();
+                marker("marker-b", 760, 520);
+                pass("NONE CONTINUED");
+            });
+        },
+
+        "branch-any-image": function () {
+            var wrong = marker("marker-b", 170, 270, function () {
+                fail("WRONG TARGET BRANCH");
+            });
+            var selected = marker("marker-c", 650, 270, function () {
+                wrong.remove();
+                selected.remove();
+                marker("marker-a", 430, 270, function (event) {
+                    event.currentTarget.remove();
+                    completion("BRANCH ANY COMPLETE");
+                    pass("MARKER C BRANCH");
+                });
+            });
+        },
+
+        "branch-if-any-text": function () {
+            var anchor = marker("marker-a", 440, 470);
+            var wrong = textTarget("BRANCH B", 100, 250, 300, function () {
+                fail("WRONG TEXT BRANCH");
+            });
+            var selected = textTarget("BRANCH C", 590, 250, 300, function () {
+                anchor.remove();
+                wrong.remove();
+                selected.remove();
+                marker("marker-b", 430, 270, function (event) {
+                    event.currentTarget.remove();
+                    completion("BRANCH TEXT COMPLETE");
+                    pass("TEXT TO IMAGE BRANCH");
+                });
+            });
         }
     };
 

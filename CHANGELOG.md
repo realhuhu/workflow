@@ -4,6 +4,19 @@
 
 ## Unreleased
 
+## 0.2.1
+
+- 增加 `ClickerBase::branch()` 链式分支 API；支持 `If`、`Any`、`IfAny` 图片/文字条件按实际命中的 target
+  分派子链，未命中的可选条件继续主链，分支处理结束后仍返回最后一个 Clicker。
+- JSON v1 增加可递归嵌套的 `branch` 动作，在解析期校验候选覆盖、分支汇合 MatchKind 和非法
+  `reverse=true` 条件。
+- Browser 测试扩展为 31 个页面、62 组 C++/JSON 流程，并增加全部运行、用例范围和流程来源命令行筛选。
+- 修复自动 Browser 测试关闭窗口时误返回 `0`、参数错误与初始化错误退出码混淆，以及向上滚动用例方向错误。
+- 可见的 Qt WebEngine Browser E2E 改为通过 `WORKFLOW_REGISTER_BROWSER_TEST=ON` 显式注册，避免普通
+  CTest 和 GitHub 托管 runner 在无交互桌面环境中启动 UI 测试。
+- **破坏性变更：** `Until::loop()` 现在返回条件是否满足；自定义 Until 派生类必须同步返回 `bool`，所有
+  SDK 使用者需要重新编译。
+
 ## 0.2.0
 
 - 增加 JSON v1 线性工作流解析器；可解析现有 Image/Text Clicker、四种动作和全部 Until，重复运行后返回链条最后一个 Clicker。

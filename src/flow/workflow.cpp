@@ -20,6 +20,7 @@
 #include <climits>
 #include <cmath>
 #include <limits>
+#include <map>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -571,6 +572,15 @@ namespace {
             return type <= Type::IF_ANY_IMAGE ? MatchKind::IMAGE : MatchKind::TEXT;
         }
 
+        [[nodiscard]] std::vector<QString> branchTargets() const {
+            if (!targets.empty()) return targets;
+            return {target};
+        }
+
+        [[nodiscard]] bool isReversed() const {
+            return kind() == MatchKind::IMAGE ? imageConfig.reverse : textConfig.reverse;
+        }
+
         [[nodiscard]] std::unique_ptr<Until> create() const {
             switch (type) {
                 case Type::IMAGE:
@@ -696,7 +706,10 @@ namespace {
         CLICK,
         DRAG,
         SCROLL,
+        BRANCH,
     };
+
+    struct BranchSpec;
 
     struct StepSpec {
         Action action = Action::CLICK;
@@ -709,6 +722,12 @@ namespace {
         int step = 10;
         bool reverse = false;
         int delta = -WheelDelta;
+        std::shared_ptr<const BranchSpec> branch;
+    };
+
+    struct BranchSpec {
+        UntilSpec condition;
+        std::map<QString, std::vector<StepSpec>> branches;
     };
 
     struct ParsedStep {
@@ -736,10 +755,61 @@ namespace {
         } else if (action == "scroll") {
             result.action = Action::SCROLL;
             allowed.unite({"delta", "interval", "offsetX", "offsetY", "position"});
+        } else if (action == "branch") {
+            result.action = Action::BRANCH;
+            allowed = {"action", "condition", "branches"};
         } else {
-            invalidJson(path + ".action", "必须是locate/click/drag/scroll");
+            invalidJson(path + ".action", "必须是locate/click/drag/scroll/branch");
         }
         rejectUnknownKeys(object, allowed, path);
+
+        if (result.action == Action::BRANCH) {
+            auto branch = std::make_shared<BranchSpec>();
+            branch->condition = parseUntil(objectValue(object, "condition", path, true), path + ".condition");
+            if (branch->condition.isReversed()) {
+                invalidJson(
+                    path + ".condition.config.reverse",
+                    "branch不支持reverse=true，因为目标未命中时没有可分派的target"
+                );
+            }
+            const QJsonObject branchObject = objectValue(object, "branches", path, true);
+            const std::vector<QString> expectedTargets = branch->condition.branchTargets();
+            QSet<QString> expectedTargetSet;
+            for (const QString& target : expectedTargets)
+                expectedTargetSet.insert(target);
+
+            for (auto iterator = branchObject.constBegin(); iterator != branchObject.constEnd(); ++iterator) {
+                const QString branchPath = path + ".branches." + iterator.key();
+                if (!expectedTargetSet.contains(iterator.key())) invalidJson(branchPath, "不是condition的候选target");
+                if (!iterator.value().isArray()) invalidJson(branchPath, "必须是步骤数组");
+
+                const QJsonArray steps = iterator.value().toArray();
+                std::vector<StepSpec> parsedSteps;
+                parsedSteps.reserve(static_cast<std::size_t>(steps.size()));
+                MatchKind branchKind = branch->condition.kind();
+                for (int index = 0; index < steps.size(); ++index) {
+                    const QString stepPath = QString("%1[%2]").arg(branchPath).arg(index);
+                    if (!steps[index].isObject()) invalidJson(stepPath, "必须是步骤对象");
+                    auto parsed = parseStep(steps[index].toObject(), stepPath, branchKind);
+                    branchKind = parsed.outputKind;
+                    parsedSteps.push_back(std::move(parsed.step));
+                }
+                if (branchKind != inputKind) {
+                    invalidJson(branchPath, "分支结束时必须回到branch之前的MatchKind");
+                }
+                branch->branches.emplace(iterator.key(), std::move(parsedSteps));
+            }
+
+            for (const QString& target : expectedTargetSet) {
+                if (!branchObject.contains(target)) {
+                    invalidJson(path + ".branches." + target, "缺少condition候选target的处理分支");
+                }
+            }
+
+            result.branch = std::move(branch);
+            return {std::move(result), inputKind};
+        }
+
         result.run = parseRunSpec(objectValue(object, "runConfig", path), path + ".runConfig", inputKind);
         if (result.action == Action::LOCATE && !result.run.runUntilList.empty()) {
             invalidJson(path + ".runConfig.runUntilList", "locate不支持runUntilList，请使用finishUntilList");
@@ -840,9 +910,31 @@ namespace {
                     step.position
                 );
                 break;
+            case Action::BRANCH:
+                throw std::logic_error("branch不能作为普通Clicker动作执行");
         }
         if (!next) throw std::runtime_error("工作流动作未返回Clicker");
         return next;
+    }
+
+    std::unique_ptr<ClickerBase> executeStep(std::unique_ptr<ClickerBase> current, const StepSpec& step);
+
+    std::unique_ptr<ClickerBase> executeBranch(
+        std::unique_ptr<ClickerBase> current,
+        const BranchSpec& spec
+    ) {
+        BranchMap branches;
+        for (const auto& entry : spec.branches) {
+            const auto* steps = &entry.second;
+            branches.emplace(entry.first, [steps](std::unique_ptr<ClickerBase> branchCurrent) {
+                for (const auto& step : *steps) {
+                    if (stopped(env.stopFlag)) break;
+                    branchCurrent = executeStep(std::move(branchCurrent), step);
+                }
+                return branchCurrent;
+            });
+        }
+        return current->branch(spec.condition.create(), branches);
     }
 
     std::unique_ptr<ClickerBase> executeStep(
@@ -851,6 +943,10 @@ namespace {
     ) {
         if (!current) throw std::logic_error("工作流当前Clicker为空");
         if (current->kind != step.inputKind) throw std::logic_error("工作流运行时MatchKind与解析结果不一致");
+        if (step.action == Action::BRANCH) {
+            if (!step.branch) throw std::logic_error("branch步骤缺少配置");
+            return executeBranch(std::move(current), *step.branch);
+        }
         OwnedConditions conditions(step.run);
         const auto start = OwnedConditions::raw(conditions.start);
         const auto run = OwnedConditions::raw(conditions.run);

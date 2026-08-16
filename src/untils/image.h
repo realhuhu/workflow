@@ -62,14 +62,14 @@ public:
 class IfImage : public Image {
 public:
     explicit IfImage(const QString& target, const ImageUntilConfig& config = {});
-    void loop(std::unique_ptr<Segment>& previous, float globalTimeout) override;
+    bool loop(std::unique_ptr<Segment>& previous, float globalTimeout) override;
     [[nodiscard]] QString toString() const override;
 };
 
 class IfAnyImage : public AnyImage {
 public:
     explicit IfAnyImage(const std::vector<QString>& targets, const ImageUntilConfig& config = {});
-    void loop(std::unique_ptr<Segment>& previous, float globalTimeout) override;
+    bool loop(std::unique_ptr<Segment>& previous, float globalTimeout) override;
     [[nodiscard]] QString toString() const override;
 };
 

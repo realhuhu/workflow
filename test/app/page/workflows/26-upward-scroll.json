@@ -30,7 +30,7 @@
         "finishWait": 0.5,
         "homing": false
       },
-      "delta": 2400,
+      "delta": 12000,
       "interval": 0.15
     }
   ]

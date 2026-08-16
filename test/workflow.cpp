@@ -1197,6 +1197,341 @@ namespace {
         return path;
     }
 
+    void testBranchDispatchesIfImageAndContinuesMainChainOnMiss() {
+        QTemporaryDir directory;
+        EXPECT_TRUE(directory.isValid());
+
+        cv::Mat targetTemplate(9, 11, CV_8UC1);
+        cv::Mat missingTemplate(9, 11, CV_8UC1);
+        cv::Mat screen(80, 100, CV_8UC1);
+        cv::RNG targetRng(0x4102);
+        cv::RNG missingRng(0x9813);
+        cv::RNG screenRng(0x7125);
+        targetRng.fill(targetTemplate, cv::RNG::UNIFORM, 0, 256);
+        missingRng.fill(missingTemplate, cv::RNG::UNIFORM, 0, 256);
+        screenRng.fill(screen, cv::RNG::UNIFORM, 0, 80);
+        targetTemplate.copyTo(screen(cv::Rect(42, 31, targetTemplate.cols, targetTemplate.rows)));
+
+        const QString targetPath = writePng(targetTemplate, directory.filePath("target.png"));
+        const QString missingPath = writePng(missingTemplate, directory.filePath("missing.png"));
+        FakePlatform platform(screen);
+        FakeOcrProvider provider;
+        EnvScope scope(&platform, &provider);
+
+        ImageUntilConfig config;
+        config.threshold = 0.999f;
+        config.interval = 0;
+        config.timeout = 1;
+
+        const Segment initial(5, 6, 12, 10, 1.0f);
+        ImageClicker start(QStringLiteral("当前页面"), initial);
+        start.previousSegment = std::make_unique<Segment>(1, 2, 3, 4, 0.8f);
+
+        bool matchedHandlerCalled = false;
+        auto matched = start.branch(
+            std::make_unique<IfImage>(targetPath, config),
+            BranchMap{
+                {targetPath,
+                    [&](std::unique_ptr<ClickerBase> current) {
+                        matchedHandlerCalled = true;
+                        EXPECT_EQ(current->kind, MatchKind::IMAGE);
+                        EXPECT_EQ(current->target, targetPath);
+                        EXPECT_EQ(current->targetSegmentList.size(), size_t(1));
+                        EXPECT_EQ(current->targetSegmentList.front().x, 42);
+                        EXPECT_EQ(current->targetSegmentList.front().y, 31);
+                        return current->locate(ImageRunConfig{.homing = false});
+                    }},
+            }
+        );
+
+        EXPECT_TRUE(matchedHandlerCalled);
+        EXPECT_EQ(matched->target, targetPath);
+        EXPECT_TRUE(static_cast<bool>(matched->previousSegment));
+        EXPECT_EQ(matched->previousSegment->x, 42);
+        auto continued = matched->locate(ImageRunConfig{.homing = false});
+        EXPECT_EQ(continued->target, targetPath);
+        EXPECT_EQ(continued->kind, MatchKind::IMAGE);
+
+        bool missingHandlerCalled = false;
+        auto missed = start.branch(
+            std::make_unique<IfImage>(missingPath, config),
+            BranchMap{
+                {missingPath,
+                    [&](std::unique_ptr<ClickerBase> current) {
+                        missingHandlerCalled = true;
+                        return current;
+                    }},
+            }
+        );
+
+        EXPECT_FALSE(missingHandlerCalled);
+        EXPECT_EQ(missed->target, QStringLiteral("当前页面"));
+        EXPECT_EQ(missed->kind, MatchKind::IMAGE);
+        EXPECT_EQ(missed->targetSegmentList, start.targetSegmentList);
+        EXPECT_TRUE(static_cast<bool>(missed->previousSegment));
+        EXPECT_EQ(missed->previousSegment->x, 1);
+        EXPECT_EQ(missed->previousSegment->y, 2);
+        EXPECT_EQ(platform.captures, 2);
+        EXPECT_EQ(provider.calls, 0);
+    }
+
+    void testBranchDispatchesAnyAndIfAnyBySelectedTarget() {
+        QTemporaryDir directory;
+        EXPECT_TRUE(directory.isValid());
+
+        cv::Mat targetTemplate(8, 10, CV_8UC1);
+        cv::Mat missingTemplate(8, 10, CV_8UC1);
+        cv::Mat screen(90, 120, CV_8UC1);
+        cv::RNG targetRng(0x1537);
+        cv::RNG missingRng(0x8642);
+        cv::RNG screenRng(0x3901);
+        targetRng.fill(targetTemplate, cv::RNG::UNIFORM, 0, 256);
+        missingRng.fill(missingTemplate, cv::RNG::UNIFORM, 0, 256);
+        screenRng.fill(screen, cv::RNG::UNIFORM, 0, 80);
+        targetTemplate.copyTo(screen(cv::Rect(61, 47, targetTemplate.cols, targetTemplate.rows)));
+
+        const QString targetPath = writePng(targetTemplate, directory.filePath("target.png"));
+        const QString missingPath = writePng(missingTemplate, directory.filePath("missing.png"));
+        FakePlatform platform(screen);
+        FakeOcrProvider provider;
+        provider.handler = [](const cv::Mat&, int) { return successfulResult({token("完成", QRect(25, 18, 20, 10))}); };
+        EnvScope scope(&platform, &provider);
+
+        ImageUntilConfig imageConfig;
+        imageConfig.threshold = 0.999f;
+        imageConfig.interval = 0;
+        imageConfig.timeout = 1;
+        TextUntilConfig textConfig;
+        textConfig.match = TextMatch::EXACT;
+        textConfig.interval = 0;
+        textConfig.timeout = 1;
+
+        const Segment initial(8, 9, 14, 12, 1.0f);
+        ImageClicker start(QStringLiteral("当前页面"), initial);
+        bool wrongImageHandlerCalled = false;
+        bool selectedImageHandlerCalled = false;
+        auto imageBranch = start.branch(
+            std::make_unique<AnyImage>(std::vector<QString>{missingPath, targetPath}, imageConfig),
+            BranchMap{
+                {missingPath,
+                    [&](std::unique_ptr<ClickerBase> current) {
+                        wrongImageHandlerCalled = true;
+                        return current;
+                    }},
+                {targetPath,
+                    [&](std::unique_ptr<ClickerBase> current) {
+                        selectedImageHandlerCalled = true;
+                        EXPECT_EQ(current->target, targetPath);
+                        EXPECT_EQ(current->kind, MatchKind::IMAGE);
+                        return current;
+                    }},
+            }
+        );
+
+        EXPECT_FALSE(wrongImageHandlerCalled);
+        EXPECT_TRUE(selectedImageHandlerCalled);
+        EXPECT_EQ(imageBranch->target, targetPath);
+        EXPECT_EQ(imageBranch->targetSegmentList.front().x, 61);
+        EXPECT_EQ(imageBranch->targetSegmentList.front().y, 47);
+
+        bool wrongTextHandlerCalled = false;
+        bool selectedTextHandlerCalled = false;
+        auto textBranch = imageBranch->branch(
+            std::make_unique<IfAnyText>(
+                std::vector<QString>{QStringLiteral("缺失"), QStringLiteral("完成")},
+                textConfig
+            ),
+            BranchMap{
+                {QStringLiteral("缺失"),
+                    [&](std::unique_ptr<ClickerBase> current) {
+                        wrongTextHandlerCalled = true;
+                        return current;
+                    }},
+                {QStringLiteral("完成"),
+                    [&](std::unique_ptr<ClickerBase> current) {
+                        selectedTextHandlerCalled = true;
+                        EXPECT_EQ(current->target, QStringLiteral("完成"));
+                        EXPECT_EQ(current->kind, MatchKind::TEXT);
+                        EXPECT_EQ(current->targetSegmentList.front().x, 25);
+                        EXPECT_EQ(current->targetSegmentList.front().y, 18);
+                        return current;
+                    }},
+            }
+        );
+
+        EXPECT_FALSE(wrongTextHandlerCalled);
+        EXPECT_TRUE(selectedTextHandlerCalled);
+        EXPECT_EQ(textBranch->target, QStringLiteral("完成"));
+        EXPECT_EQ(textBranch->kind, MatchKind::TEXT);
+
+        bool noneHandlerCalled = false;
+        auto continued = textBranch->branch(
+            std::make_unique<IfAnyText>(
+                std::vector<QString>{QStringLiteral("不存在A"), QStringLiteral("不存在B")},
+                textConfig
+            ),
+            BranchMap{
+                {QStringLiteral("不存在A"),
+                    [&](std::unique_ptr<ClickerBase> current) {
+                        noneHandlerCalled = true;
+                        return current;
+                    }},
+                {QStringLiteral("不存在B"),
+                    [&](std::unique_ptr<ClickerBase> current) {
+                        noneHandlerCalled = true;
+                        return current;
+                    }},
+            }
+        );
+
+        EXPECT_FALSE(noneHandlerCalled);
+        EXPECT_EQ(continued->target, QStringLiteral("完成"));
+        EXPECT_EQ(continued->kind, MatchKind::TEXT);
+        EXPECT_EQ(continued->targetSegmentList, textBranch->targetSegmentList);
+        EXPECT_EQ(platform.captures, 3);
+        EXPECT_EQ(provider.calls, 2);
+    }
+
+    void testBranchRejectsInvalidHandlersAndHonorsStop() {
+        QTemporaryDir directory;
+        EXPECT_TRUE(directory.isValid());
+
+        cv::Mat targetTemplate(8, 10, CV_8UC1);
+        cv::Mat screen(60, 80, CV_8UC1);
+        cv::RNG targetRng(0x5127);
+        cv::RNG screenRng(0x7843);
+        targetRng.fill(targetTemplate, cv::RNG::UNIFORM, 0, 256);
+        screenRng.fill(screen, cv::RNG::UNIFORM, 0, 80);
+        targetTemplate.copyTo(screen(cv::Rect(30, 20, targetTemplate.cols, targetTemplate.rows)));
+        const QString targetPath = writePng(targetTemplate, directory.filePath("target.png"));
+
+        FakePlatform platform(screen);
+        FakeOcrProvider provider;
+        EnvScope scope(&platform, &provider);
+        ImageUntilConfig config;
+        config.threshold = 0.999f;
+        config.interval = 0;
+        config.timeout = 1;
+        ImageClicker start(QStringLiteral("当前页面"), Segment(4, 5, 12, 10, 1.0f));
+
+        EXPECT_THROWS(std::invalid_argument, start.branch(nullptr, {}));
+        EXPECT_THROWS(std::invalid_argument, start.branch(std::make_unique<IfImage>(targetPath, config), {}));
+
+        const BranchMap nullResult{
+            {targetPath, [](std::unique_ptr<ClickerBase>) { return std::unique_ptr<ClickerBase>{}; }},
+        };
+        EXPECT_THROWS(std::runtime_error, start.branch(std::make_unique<IfImage>(targetPath, config), nullResult));
+
+        ImageUntilConfig reverseConfig = config;
+        reverseConfig.reverse = true;
+        const int capturesBeforeReverse = platform.captures;
+        EXPECT_THROWS(
+            std::invalid_argument,
+            start.branch(
+                std::make_unique<IfImage>(targetPath, reverseConfig),
+                BranchMap{{targetPath, [](std::unique_ptr<ClickerBase> current) { return current; }}}
+            )
+        );
+        EXPECT_EQ(platform.captures, capturesBeforeReverse);
+
+        platform.screen.release();
+        EXPECT_THROWS(
+            std::runtime_error,
+            start.branch(
+                std::make_unique<IfImage>(targetPath, config),
+                BranchMap{{targetPath, [](std::unique_ptr<ClickerBase> current) { return current; }}}
+            )
+        );
+
+        bool stoppedHandlerCalled = false;
+        auto stopped = start.branch(
+            std::make_unique<StopTrueUntil>(),
+            BranchMap{
+                {QStringLiteral("test"),
+                    [&](std::unique_ptr<ClickerBase> current) {
+                        stoppedHandlerCalled = true;
+                        return current;
+                    }},
+            }
+        );
+        EXPECT_FALSE(stoppedHandlerCalled);
+        EXPECT_EQ(stopped->target, QStringLiteral("当前页面"));
+        EXPECT_EQ(stopped->kind, MatchKind::IMAGE);
+        EXPECT_EQ(stopped->targetSegmentList, start.targetSegmentList);
+    }
+
+    void testJsonWorkflowExecutesSelectedBranchHandler() {
+        QTemporaryDir directory;
+        EXPECT_TRUE(directory.isValid());
+
+        cv::Mat targetTemplate(8, 10, CV_8UC1);
+        cv::Mat missingTemplate(8, 10, CV_8UC1);
+        cv::Mat screen(70, 90, CV_8UC1);
+        cv::RNG targetRng(0x2741);
+        cv::RNG missingRng(0x6193);
+        cv::RNG screenRng(0x8532);
+        targetRng.fill(targetTemplate, cv::RNG::UNIFORM, 0, 256);
+        missingRng.fill(missingTemplate, cv::RNG::UNIFORM, 0, 256);
+        screenRng.fill(screen, cv::RNG::UNIFORM, 0, 80);
+        targetTemplate.copyTo(screen(cv::Rect(40, 30, targetTemplate.cols, targetTemplate.rows)));
+
+        const QString targetPath = writePng(targetTemplate, directory.filePath("target.png"));
+        const QString missingPath = writePng(missingTemplate, directory.filePath("missing.png"));
+        FakePlatform platform(screen);
+        FakeOcrProvider provider;
+        EnvScope scope(&platform, &provider);
+
+        const auto clickStep = [](const int offsetX, const int offsetY) {
+            return QJsonObject{
+                {"action", "click"},
+                {"runConfig", QJsonObject{{"homing", false}}},
+                {"interval", 0},
+                {"offsetX", offsetX},
+                {"offsetY", offsetY},
+            };
+        };
+        QJsonObject branches;
+        branches.insert(missingPath, QJsonArray{clickStep(-20, 0)});
+        branches.insert(targetPath, QJsonArray{clickStep(3, -2)});
+
+        const Workflow workflow = parseWorkflow(
+            QJsonObject{
+                {"version", 1},
+                {"name", "JSON branch"},
+                {"clicker",
+                    QJsonObject{
+                        {"kind", "IMAGE"},
+                        {"target", targetPath},
+                        {"config", QJsonObject{{"threshold", 0.999}, {"timeout", 1}}},
+                    }},
+                {"steps",
+                    QJsonArray{
+                        QJsonObject{
+                            {"action", "branch"},
+                            {"condition",
+                                QJsonObject{
+                                    {"type", "AnyImage"},
+                                    {"targets", QJsonArray{missingPath, targetPath}},
+                                    {"config", QJsonObject{{"threshold", 0.999}, {"interval", 0}, {"timeout", 1}}},
+                                }},
+                            {"branches", branches},
+                        },
+                    }},
+            }
+        );
+
+        EXPECT_EQ(workflow.stepCount(), size_t(1));
+        const auto result = workflow.run();
+        EXPECT_TRUE(static_cast<bool>(result));
+        EXPECT_EQ(result->target, targetPath);
+        EXPECT_EQ(result->kind, MatchKind::IMAGE);
+        const auto clicks = platform.clickPoints();
+        EXPECT_EQ(clicks.size(), size_t(1));
+        EXPECT_EQ(clicks.front(), QPoint(48, 32));
+        EXPECT_EQ(platform.captures, 2);
+        EXPECT_EQ(provider.calls, 0);
+    }
+
     QJsonObject imageCondition(
         const QString& type,
         const QString& target,
@@ -1370,6 +1705,31 @@ namespace {
         steps[0] = first;
         locateWithRunUntil["steps"] = steps;
         EXPECT_THROWS(std::invalid_argument, parseWorkflow(locateWithRunUntil));
+
+        const QJsonObject reverseBranch{
+            {"version", 1},
+            {"name", "Invalid reverse branch"},
+            {"clicker",
+                QJsonObject{
+                    {"kind", "IMAGE"},
+                    {"target", "initial.png"},
+                    {"config", QJsonObject{}},
+                }},
+            {"steps",
+                QJsonArray{
+                    QJsonObject{
+                        {"action", "branch"},
+                        {"condition",
+                            QJsonObject{
+                                {"type", "IfImage"},
+                                {"target", "target.png"},
+                                {"config", QJsonObject{{"reverse", true}}},
+                            }},
+                        {"branches", QJsonObject{{"target.png", QJsonArray{}}}},
+                    },
+                }},
+        };
+        EXPECT_THROWS(std::invalid_argument, parseWorkflow(reverseBranch));
 
         EXPECT_THROWS(std::invalid_argument, parseWorkflow(QByteArray("[1,2,3]")));
         EXPECT_THROWS(std::invalid_argument, parseWorkflow(QByteArray("{broken")));
@@ -1818,7 +2178,7 @@ namespace {
     void testBrowserJsonWorkflowsAllParse() {
         const QDir root(QString::fromUtf8(WORKFLOW_TEST_WORKFLOW_ROOT));
         const QStringList files = root.entryList({QStringLiteral("*.json")}, QDir::Files, QDir::Name);
-        EXPECT_EQ(files.size(), 28);
+        EXPECT_EQ(files.size(), 31);
 
         for (const QString& file : files) {
             const Workflow workflow = parseWorkflowFile(root.filePath(file));
@@ -1856,6 +2216,11 @@ int main(
         {"scroll finish Text creates the next text target", testScrollFinishTextCreatesNextTextTarget},
         {"unified Clicker chains image to text to image", testUnifiedClickerImageTextImageChain},
         {"unified Clicker preserves AnyImage and AnyText targets", testUnifiedClickerTextAnyImageAnyTextChain},
+        {"branch dispatches IfImage and continues the main chain on miss",
+            testBranchDispatchesIfImageAndContinuesMainChainOnMiss},
+        {"branch dispatches Any and IfAny by the selected target", testBranchDispatchesAnyAndIfAnyBySelectedTarget},
+        {"branch rejects invalid handlers and honors stop", testBranchRejectsInvalidHandlersAndHonorsStop},
+        {"JSON workflow executes the selected branch handler", testJsonWorkflowExecutesSelectedBranchHandler},
         {"scroll supports every Until family and optional conditions are one-shot",
             testScrollSupportsEveryUntilFamilyAndOptionalConditionsAreOneShot},
         {"JSON workflow executes the existing Clicker chain and returns its last Clicker",

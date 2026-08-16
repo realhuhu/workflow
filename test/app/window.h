@@ -2,9 +2,12 @@
 #define WORKFLOW_TEST_APP_WINDOW_H
 
 #include <QMainWindow>
+#include <QStringList>
 
 #include <atomic>
 #include <memory>
+#include <optional>
+#include <vector>
 
 #include "cases.h"
 
@@ -28,10 +31,20 @@ public:
     explicit TestWindow(QWidget* parent = nullptr);
     ~TestWindow() override;
 
+    void startAutomaticRun(std::vector<int> caseIds = {}, std::optional<TestWorkflowSource> source = std::nullopt);
+
+signals:
+    void automaticRunFinished(int exitCode);
+
 protected:
     void closeEvent(QCloseEvent* event) override;
 
 private:
+    struct BatchRun {
+        int caseId;
+        TestWorkflowSource source;
+    };
+
     QWebEngineView* browser{};
     QListWidget* caseList{};
     QLabel* caseTitle{};
@@ -60,6 +73,13 @@ private:
     int batchRunIndex = 0;
     int batchPassed = 0;
     int batchFailed = 0;
+    bool automaticMode = false;
+    bool automaticRunCompleted = false;
+    int automaticStartupAttempts = 0;
+    std::vector<int> automaticCaseIds;
+    std::optional<TestWorkflowSource> automaticSource;
+    std::vector<BatchRun> batchRuns;
+    QStringList automaticResults;
 
     void buildInterface();
     void configureBrowser();
@@ -76,6 +96,10 @@ private:
     void runBatchCurrentCase();
     void completeBatchCase(bool success, const QString& message);
     void finishBatch(bool stopped);
+    void startAutomaticRunWhenReady();
+    void failAutomaticRun(const QString& message);
+    void completeAutomaticRun(const QString& summary, int exitCode);
+    void printAutomaticResults(const QString& summary) const;
     void startCaseWorker(int id, TestWorkflowSource source);
     void finishCaseWorker(int id, TestWorkflowSource source, bool success, const QString& message);
     void stopCurrentCase();

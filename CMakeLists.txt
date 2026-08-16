@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(workflow VERSION 0.2.0 LANGUAGES CXX)
+project(workflow VERSION 0.2.1 LANGUAGES CXX)
 
 if (NOT WIN32)
     message(FATAL_ERROR "workflow currently supports Windows only")
@@ -27,6 +27,9 @@ option(WORKFLOW_BUILD_TESTS "Build workflow tests" ${_workflow_developer_default
 option(WORKFLOW_BUILD_TEST_APP
         "Build the Qt WebEngine visual test application"
         ${_workflow_developer_default})
+option(WORKFLOW_REGISTER_BROWSER_TEST
+        "Register the visible Qt WebEngine browser test with CTest"
+        OFF)
 option(WORKFLOW_INSTALL "Generate install and CMake package rules" ${PROJECT_IS_TOP_LEVEL})
 set(WORKFLOW_CLANG_FORMAT_EXECUTABLE "$ENV{CLANG_FORMAT}" CACHE FILEPATH
         "clang-format 22 or newer executable")

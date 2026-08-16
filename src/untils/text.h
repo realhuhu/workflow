@@ -84,14 +84,14 @@ public:
 class IfText : public Text {
 public:
     explicit IfText(const QString& target, TextUntilConfig config = {});
-    void loop(std::unique_ptr<Segment>& previous, float globalTimeout) override;
+    bool loop(std::unique_ptr<Segment>& previous, float globalTimeout) override;
     [[nodiscard]] QString toString() const override;
 };
 
 class IfAnyText : public AnyText {
 public:
     explicit IfAnyText(const std::vector<QString>& targets, TextUntilConfig config = {});
-    void loop(std::unique_ptr<Segment>& previous, float globalTimeout) override;
+    bool loop(std::unique_ptr<Segment>& previous, float globalTimeout) override;
     [[nodiscard]] QString toString() const override;
 };
 

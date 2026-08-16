@@ -16,12 +16,13 @@ public:
     const MatchKind kind;
 
     virtual ~Until() = default;
-    virtual void loop(std::unique_ptr<Segment>& previous, float globalTimeout);
+    virtual bool loop(std::unique_ptr<Segment>& previous, float globalTimeout);
     virtual void preHook(std::unique_ptr<Segment>& previous);
     [[nodiscard]] virtual bool flag(std::unique_ptr<Segment>& previous);
     [[nodiscard]] virtual QString toString() const = 0;
 
     bool fulfilled(std::unique_ptr<Segment>& previous);
+    [[nodiscard]] bool isReversed() const;
 
     [[nodiscard]] std::vector<Segment> filter(
         const std::vector<Segment>& positions,

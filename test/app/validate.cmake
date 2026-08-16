@@ -9,6 +9,7 @@ get_filename_component(
         "${WORKFLOW_TEST_PAGE_ROOT}/.."
         ABSOLUTE)
 file(READ "${_test_app_root}/cases.cpp" _test_cases_source)
+set(_expected_case_count 31)
 
 string(REGEX MATCHALL
         "std::make_unique<(Image|Text)Clicker>"
@@ -20,12 +21,12 @@ string(REGEX MATCHALL
         "${_test_cases_source}")
 list(LENGTH _test_chain_starts _test_chain_start_count)
 list(LENGTH _test_chain_ends _test_chain_end_count)
-if (NOT _test_chain_start_count EQUAL 28 OR
-    NOT _test_chain_end_count EQUAL 28)
+if (NOT _test_chain_start_count EQUAL ${_expected_case_count} OR
+    NOT _test_chain_end_count EQUAL ${_expected_case_count})
     message(FATAL_ERROR
             "Every test case must be one strict Clicker chain. "
             "Found ${_test_chain_start_count} starts and "
-            "${_test_chain_end_count} ends; expected 28 of each.")
+            "${_test_chain_end_count} ends; expected ${_expected_case_count} of each.")
 endif()
 
 foreach (_forbidden_pattern
@@ -68,7 +69,10 @@ set(_expected_pages
         25-reverse-drag.html
         26-upward-scroll.html
         27-multiple-until-and.html
-        28-wait-phases.html)
+        28-wait-phases.html
+        29-branch-if-none.html
+        30-branch-any-image.html
+        31-branch-if-any-text.html)
 
 file(GLOB _actual_pages
         RELATIVE "${WORKFLOW_TEST_PAGE_ROOT}/cases"
@@ -76,7 +80,7 @@ file(GLOB _actual_pages
 list(SORT _actual_pages)
 if (NOT _actual_pages STREQUAL _expected_pages)
     message(FATAL_ERROR
-            "Test pages differ from the required 28-page contract.\n"
+            "Test pages differ from the required ${_expected_case_count}-page contract.\n"
             "Expected: ${_expected_pages}\nActual: ${_actual_pages}")
 endif()
 
@@ -91,7 +95,7 @@ file(GLOB _actual_workflows
 list(SORT _actual_workflows)
 if (NOT _actual_workflows STREQUAL _expected_workflows)
     message(FATAL_ERROR
-            "JSON workflows differ from the required 28-case contract.\n"
+            "JSON workflows differ from the required ${_expected_case_count}-case contract.\n"
             "Expected: ${_expected_workflows}\nActual: ${_actual_workflows}")
 endif()
 
@@ -133,8 +137,9 @@ endforeach()
 file(READ "${WORKFLOW_TEST_PAGE_ROOT}/assets/catalog.js" _catalog)
 string(REGEX MATCHALL "id: [0-9]+" _catalog_ids "${_catalog}")
 list(LENGTH _catalog_ids _catalog_count)
-if (NOT _catalog_count EQUAL 28)
-    message(FATAL_ERROR "The test catalog must contain exactly 28 cases; found ${_catalog_count}")
+if (NOT _catalog_count EQUAL ${_expected_case_count})
+    message(FATAL_ERROR
+            "The test catalog must contain exactly ${_expected_case_count} cases; found ${_catalog_count}")
 endif()
 
 file(READ "${WORKFLOW_TEST_PAGE_ROOT}/assets/case.js" _runtime)
@@ -146,4 +151,4 @@ foreach (_page IN LISTS _expected_pages)
     endif()
 endforeach()
 
-message(STATUS "Validated 28 deterministic test pages and JSON workflows")
+message(STATUS "Validated ${_expected_case_count} deterministic test pages and JSON workflows")

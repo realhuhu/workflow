@@ -29,7 +29,10 @@
         { id: 25, slug: "reverse-drag", title: "反向纵向拖动", group: "ACTION", api: "drag(reverse=true)", summary: "从底部向上拖动并由文字条件终止。" },
         { id: 26, slug: "upward-scroll", title: "滚轮向上单次滚动", group: "ACTION", api: "scroll(delta > 0)", summary: "正 delta 单次滚动后等待文字完成条件。" },
         { id: 27, slug: "multiple-until-and", title: "多条件 AND 终止", group: "UNTIL", api: "runUntilList AND", summary: "图片和文字必须在同一轮同时满足。" },
-        { id: 28, slug: "wait-phases", title: "执行阶段等待与归位", group: "LIFECYCLE", api: "startWait / finishWait / homing", summary: "覆盖动作前后等待与归位开关。" }
+        { id: 28, slug: "wait-phases", title: "执行阶段等待与归位", group: "LIFECYCLE", api: "startWait / finishWait / homing", summary: "覆盖动作前后等待与归位开关。" },
+        { id: 29, slug: "branch-if-none", title: "If 未命中继续主链", group: "BRANCH", api: "branch + IfImage", summary: "未命中不调用分支，直接继续主链。" },
+        { id: 30, slug: "branch-any-image", title: "AnyImage 目标分支", group: "BRANCH", api: "branch + AnyImage", summary: "根据 AnyImage 实际 target 选择子流程。" },
+        { id: 31, slug: "branch-if-any-text", title: "IfAnyText 跨类型分支", group: "BRANCH", api: "branch + IfAnyText", summary: "文字子流程收敛回图片主链。" }
     ];
 
     window.workflowEnvironment = function () {

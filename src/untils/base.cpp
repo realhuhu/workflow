@@ -14,7 +14,7 @@ Until::Until(
 ) : target(std::move(target)), kind(kind) {
 }
 
-void Until::loop(
+bool Until::loop(
     std::unique_ptr<Segment>& previous,
     const float globalTimeout
 ) {
@@ -34,10 +34,11 @@ void Until::loop(
 
         if (fulfilled(previous)) {
             sleep(env.stopFlag, runtime.finishWait);
-            return;
+            return true;
         }
         sleep(env.stopFlag, runtime.interval);
     }
+    return false;
 }
 
 bool Until::flag(
@@ -65,6 +66,10 @@ bool Until::fulfilled(
         logMessage("条件未满足: " + toString());
     }
     return false;
+}
+
+bool Until::isReversed() const {
+    return runtimeConfig().reverse;
 }
 
 std::vector<Segment> Until::filter(

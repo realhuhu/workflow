@@ -37,6 +37,7 @@
 
 #include <exception>
 #include <functional>
+#include <iostream>
 #include <stdexcept>
 #include <utility>
 
@@ -200,6 +201,43 @@ TestWindow::~TestWindow() {
     if (worker && worker->isRunning()) worker->wait();
 }
 
+void TestWindow::startAutomaticRun(
+    std::vector<int> caseIds,
+    const std::optional<TestWorkflowSource> source
+) {
+    if (automaticMode) return;
+    automaticMode = true;
+    automaticCaseIds = std::move(caseIds);
+    automaticSource = source;
+    automaticResults.clear();
+    if (!ocrReady) {
+        failAutomaticRun(QStringLiteral("RapidOCR 未就绪，无法运行 Browser 自动测试"));
+        return;
+    }
+    automaticStartupAttempts = 0;
+    QTimer::singleShot(0, this, &TestWindow::startAutomaticRunWhenReady);
+}
+
+void TestWindow::startAutomaticRunWhenReady() {
+    if (pageReady && currentCaseId == 0) {
+        runAllCases();
+        return;
+    }
+    if (++automaticStartupAttempts >= 300) {
+        failAutomaticRun(QStringLiteral("等待 Browser 首页加载和 DPI 校准超时"));
+        return;
+    }
+    QTimer::singleShot(50, this, &TestWindow::startAutomaticRunWhenReady);
+}
+
+void TestWindow::failAutomaticRun(
+    const QString& message
+) {
+    automaticResults.push_back(QStringLiteral("[FATAL] %1").arg(message));
+    appendLog(message, QStringLiteral("red"));
+    completeAutomaticRun(QStringLiteral("SUMMARY passed=0 failed=1 total=0 stopped=false"), 1);
+}
+
 void TestWindow::buildInterface() {
     auto* central = new QWidget(this);
     central->setObjectName(QStringLiteral("central"));
@@ -265,7 +303,8 @@ void TestWindow::buildInterface() {
 
     caseTitle = new QLabel(QStringLiteral("选择一个测试用例"), panel);
     caseTitle->setObjectName(QStringLiteral("caseTitle"));
-    caseDetails = new QLabel(QStringLiteral("左侧索引包含 28 个独立二级页面。"), panel);
+    caseDetails =
+        new QLabel(QStringLiteral("左侧索引包含 %1 个独立二级页面。").arg(static_cast<int>(testCases().size())), panel);
     caseDetails->setObjectName(QStringLiteral("caseDetails"));
     caseDetails->setWordWrap(true);
     panelLayout->addWidget(caseTitle);
@@ -411,7 +450,7 @@ void TestWindow::loadIndex() {
         caseList->clearSelection();
         caseList->setCurrentRow(-1);
     }
-    caseTitle->setText(QStringLiteral("28 个确定性测试页面"));
+    caseTitle->setText(QStringLiteral("%1 个确定性测试页面").arg(static_cast<int>(testCases().size())));
     caseDetails->setText(QStringLiteral("从索引或右侧列表选择用例；网页区域固定为 1000 × 800 CSS px。"));
     setRunState(QStringLiteral("ready"), QStringLiteral("INDEX"));
     browser->load(QUrl::fromLocalFile(QDir(webRoot).filePath(QStringLiteral("index.html"))));
@@ -534,6 +573,29 @@ void TestWindow::runAllCases() {
         return;
     }
 
+    std::vector<int> selectedCaseIds;
+    if (automaticMode && !automaticCaseIds.empty()) {
+        selectedCaseIds = automaticCaseIds;
+    } else {
+        selectedCaseIds.reserve(testCases().size());
+        for (const TestCase& definition : testCases())
+            selectedCaseIds.push_back(definition.id);
+    }
+
+    batchRuns.clear();
+    for (const int caseId : selectedCaseIds) {
+        if (!automaticMode || !automaticSource || *automaticSource == TestWorkflowSource::CPP) {
+            batchRuns.push_back({caseId, TestWorkflowSource::CPP});
+        }
+        if (!automaticMode || !automaticSource || *automaticSource == TestWorkflowSource::JSON) {
+            batchRuns.push_back({caseId, TestWorkflowSource::JSON});
+        }
+    }
+    if (batchRuns.empty()) {
+        if (automaticMode) failAutomaticRun(QStringLiteral("筛选后没有可运行的 Browser 测试"));
+        return;
+    }
+
     batchRunning = true;
     batchWaitingForPage = false;
     batchRunIndex = 0;
@@ -541,9 +603,9 @@ void TestWindow::runAllCases() {
     batchFailed = 0;
     stopFlag.store(false);
     appendLog(
-        QStringLiteral("════ 开始批量运行 %1 项：%2 个用例 × C++/JSON ════")
-            .arg(static_cast<int>(testCases().size() * 2))
-            .arg(static_cast<int>(testCases().size())),
+        QStringLiteral("════ 开始批量运行 %1 项：%2 个用例 ════")
+            .arg(static_cast<int>(batchRuns.size()))
+            .arg(static_cast<int>(selectedCaseIds.size())),
         QStringLiteral("orange")
     );
     updateControls();
@@ -554,11 +616,12 @@ void TestWindow::runNextBatchCase() {
     if (!batchRunning) return;
     if (stopFlag.load()) return finishBatch(true);
 
-    const int total = static_cast<int>(testCases().size() * 2);
+    const int total = static_cast<int>(batchRuns.size());
     if (batchRunIndex >= total) return finishBatch(false);
 
-    const TestCase& definition = testCases().at(static_cast<size_t>(batchRunIndex / 2));
-    const TestWorkflowSource source = batchRunIndex % 2 == 0 ? TestWorkflowSource::CPP : TestWorkflowSource::JSON;
+    const BatchRun& run = batchRuns.at(static_cast<size_t>(batchRunIndex));
+    const TestCase& definition = *findCase(run.caseId);
+    const TestWorkflowSource source = run.source;
     const int sourceIndex = workflowSource->findData(static_cast<int>(source));
     if (sourceIndex >= 0) workflowSource->setCurrentIndex(sourceIndex);
 
@@ -575,9 +638,10 @@ void TestWindow::runBatchCurrentCase() {
     }
 
     const int runIndex = batchRunIndex;
-    const TestCase& definition = testCases().at(static_cast<size_t>(runIndex / 2));
-    const TestWorkflowSource source = runIndex % 2 == 0 ? TestWorkflowSource::CPP : TestWorkflowSource::JSON;
-    const int total = static_cast<int>(testCases().size() * 2);
+    const BatchRun& run = batchRuns.at(static_cast<size_t>(runIndex));
+    const TestCase& definition = *findCase(run.caseId);
+    const TestWorkflowSource source = run.source;
+    const int total = static_cast<int>(batchRuns.size());
     appendLog(
         QStringLiteral("—— [%1/%2] 用例 %3 · %4 ——")
             .arg(runIndex + 1)
@@ -592,7 +656,11 @@ void TestWindow::runBatchCurrentCase() {
     browser->page()->runJavaScript(
         QStringLiteral("window.workflowFixture.reset()"),
         [this, runIndex, id = definition.id, source](const QVariant&) {
-            QTimer::singleShot(80, this, [this, runIndex, id, source] {
+            // The first Chromium surface can report loadFinished before its first
+            // composited frame is available to PrintWindow. Give only that cold
+            // start enough time to become capturable; subsequent pages are warm.
+            const int settleDelayMs = runIndex == 0 ? 1000 : 80;
+            QTimer::singleShot(settleDelayMs, this, [this, runIndex, id, source] {
                 if (!batchRunning || batchRunIndex != runIndex || currentCaseId != id || worker) return;
                 startCaseWorker(id, source);
             });
@@ -606,19 +674,20 @@ void TestWindow::completeBatchCase(
 ) {
     if (!batchRunning) return;
 
-    const int total = static_cast<int>(testCases().size() * 2);
-    const TestCase& definition = testCases().at(static_cast<size_t>(batchRunIndex / 2));
-    const TestWorkflowSource source = batchRunIndex % 2 == 0 ? TestWorkflowSource::CPP : TestWorkflowSource::JSON;
+    const int total = static_cast<int>(batchRuns.size());
+    const BatchRun& run = batchRuns.at(static_cast<size_t>(batchRunIndex));
+    const TestCase& definition = *findCase(run.caseId);
+    const TestWorkflowSource source = run.source;
     if (success) ++batchPassed;
     else ++batchFailed;
-    appendLog(
+    const QString result =
         QStringLiteral("[%1/%2] %3 · %4：%5 — %6")
             .arg(batchRunIndex + 1)
             .arg(total)
             .arg(definition.id, 2, 10, QLatin1Char('0'))
-            .arg(workflowSourceName(source), success ? QStringLiteral("PASS") : QStringLiteral("FAIL"), message),
-        success ? QStringLiteral("green") : QStringLiteral("red")
-    );
+            .arg(workflowSourceName(source), success ? QStringLiteral("PASS") : QStringLiteral("FAIL"), message);
+    appendLog(result, success ? QStringLiteral("green") : QStringLiteral("red"));
+    if (automaticMode) automaticResults.push_back(result);
 
     ++batchRunIndex;
     QTimer::singleShot(120, this, &TestWindow::runNextBatchCase);
@@ -627,33 +696,62 @@ void TestWindow::completeBatchCase(
 void TestWindow::finishBatch(
     const bool stopped
 ) {
-    const int total = static_cast<int>(testCases().size() * 2);
+    const int total = static_cast<int>(batchRuns.size());
     const int completed = batchPassed + batchFailed;
     batchRunning = false;
     batchWaitingForPage = false;
 
+    QString summary;
     if (stopped) {
         setRunState(QStringLiteral("fail"), QStringLiteral("STOPPED"));
-        appendLog(
-            QStringLiteral("════ 批量运行已停止：完成 %1/%2，通过 %3，失败 %4 ════")
-                .arg(completed)
-                .arg(total)
-                .arg(batchPassed)
-                .arg(batchFailed),
-            QStringLiteral("orange")
-        );
+        summary = QStringLiteral("════ 批量运行已停止：完成 %1/%2，通过 %3，失败 %4 ════")
+                      .arg(completed)
+                      .arg(total)
+                      .arg(batchPassed)
+                      .arg(batchFailed);
+        appendLog(summary, QStringLiteral("orange"));
     } else {
         const bool success = batchFailed == 0;
         setRunState(
             success ? QStringLiteral("pass") : QStringLiteral("fail"),
             success ? QStringLiteral("ALL PASS") : QStringLiteral("HAS FAIL")
         );
-        appendLog(
-            QStringLiteral("════ 批量运行完成：通过 %1/%2，失败 %3 ════").arg(batchPassed).arg(total).arg(batchFailed),
-            success ? QStringLiteral("green") : QStringLiteral("red")
-        );
+        summary =
+            QStringLiteral("════ 批量运行完成：通过 %1/%2，失败 %3 ════").arg(batchPassed).arg(total).arg(batchFailed);
+        appendLog(summary, success ? QStringLiteral("green") : QStringLiteral("red"));
     }
     updateControls();
+
+    if (automaticMode) {
+        const QString machineSummary = QStringLiteral("SUMMARY passed=%1 failed=%2 total=%3 stopped=%4")
+                                           .arg(batchPassed)
+                                           .arg(batchFailed)
+                                           .arg(total)
+                                           .arg(stopped ? QStringLiteral("true") : QStringLiteral("false"));
+        const int exitCode = !stopped && batchFailed == 0 ? 0 : 1;
+        completeAutomaticRun(machineSummary, exitCode);
+    }
+}
+
+void TestWindow::completeAutomaticRun(
+    const QString& summary,
+    const int exitCode
+) {
+    if (automaticRunCompleted) return;
+    automaticRunCompleted = true;
+    printAutomaticResults(summary);
+    emit automaticRunFinished(exitCode);
+}
+
+void TestWindow::printAutomaticResults(
+    const QString& summary
+) const {
+    std::cout << "WORKFLOW_TEST_RESULTS_BEGIN\n";
+    for (const QString& result : automaticResults)
+        std::cout << result.toUtf8().constData() << '\n';
+    std::cout << summary.toUtf8().constData() << '\n';
+    std::cout << "WORKFLOW_TEST_RESULTS_END\n";
+    std::cout.flush();
 }
 
 void TestWindow::startCaseWorker(
@@ -803,6 +901,15 @@ void TestWindow::closeEvent(
             QStringLiteral("仍在停止"),
             QStringLiteral("截图调用仍在运行，测试台暂时不能安全关闭。")
         );
+        event->ignore();
+        return;
+    }
+    if (automaticMode && !automaticRunCompleted) {
+        if (batchRunning) {
+            finishBatch(true);
+        } else {
+            failAutomaticRun(QStringLiteral("自动运行因测试窗口关闭而停止"));
+        }
         event->ignore();
         return;
     }

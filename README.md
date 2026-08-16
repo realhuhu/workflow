@@ -40,7 +40,7 @@ src/
 │   ├── image.h/.cpp           # 图片 Until 家族
 │   └── text.h/.cpp            # 文字 Until 家族与 OCR ROI 解析
 ├── flow/
-│   └── workflow.h/.cpp        # JSON 线性工作流解析与执行
+│   └── workflow.h/.cpp        # JSON 工作流与分支解析执行
 ├── matching/
 │   ├── image.h/.cpp           # 截图门面、模板匹配、ROI、NMS
 │   ├── text.h/.cpp            # token 文字匹配和编辑距离
@@ -49,7 +49,7 @@ src/
 ├── support/                   # OCR、日志、资源路径、停止与计时
 └── third_party/rapidocr/       # RapidOCR 第三方实现
 
-test/                          # 单元测试、消费验证、28 页可视化测试程序
+test/                          # 单元测试、消费验证、31 页可视化测试程序
 cmake/                         # CMake 安装、运行时部署、格式化和 Windows manifest
 tool/                          # CI 依赖安装、打包与 Windows 7 PE 导入审计
 .github/workflows/             # Windows 构建、测试、制品和标签发布
@@ -161,7 +161,7 @@ TextClicker 首次匹配时先截图，再裁剪 `region`，最后调用 OCR。�
 
 ## 动作与 RunConfig
 
-两种 Clicker 都支持 `locate`、`click`、`drag`、`scroll`、`founded` 和 `end`。无参动作使用对应
+两种 Clicker 都支持 `locate`、`click`、`drag`、`scroll`、`branch`、`founded` 和 `end`。无参动作使用对应
 RunConfig 的默认值；带配置动作在编译期要求正确类型。
 
 ```cpp
@@ -183,6 +183,7 @@ auto next = imageClicker.click(
 | `click(config, interval, offsetX, offsetY, position)` | 至少点击一次；有 run 条件时循环到全部满足 |
 | `drag(config, step, reverse)` | 沿 Y 轴拖动并重新匹配当前目标 |
 | `scroll(config, delta, interval, offsetX, offsetY, position)` | 无 run 条件滚动一次；有条件先检查当前页，未满足才滚动 |
+| `branch(condition, branches)` | 根据 Until 实际命中的 target 执行对应子链；If 未命中时继续主链 |
 | `founded()` | 当前 `targetSegmentList` 是否非空 |
 | `end()` | 链式终点，无额外动作 |
 
@@ -199,6 +200,10 @@ auto next = imageClicker.click(
 
 `ImageRunConfig` 额外提供 `selector`，默认 `similaritySelector`。`TextRunConfig` 没有 selector，文字目标
 固定使用首个匹配结果。
+
+`BranchMap` 是 `QString -> BranchFunction` 映射。处理函数收到由命中 Until 创建的 Clicker，返回子链的
+最后一个 Clicker；`AnyImage/AnyText/IfAny*` 使用实际选中的候选 target 查表。缺少处理函数或返回空
+Clicker 会抛出异常。
 
 动作返回 `std::unique_ptr<ClickerBase>`，因为最后一个 run/finish 条件可能改变下一节点类别。
 `ClickerBase` 直接接受两种 RunConfig，因此跨图片/文字节点仍可保持原有链式写法，不需要类型转换：
@@ -234,10 +239,10 @@ imageClicker
 停止标记置位后不再发送新的输入，流程返回当前节点的克隆。同步 `PrintWindow` 调用本身无法被停止标记或
 框架超时中断；目标窗口线程挂起时，截图仍可能阻塞。
 
-## JSON 线性工作流
+## JSON 工作流
 
 `parseWorkflow()` 将 JSON 一次性解析并校验为可重复运行的 `Workflow` 对象。`Workflow::run()` 在运行时
-创建首个 Clicker，依次调用现有 `locate/click/drag/scroll` API，并把每个动作返回的 Clicker 作为下一步
+创建首个 Clicker，依次调用现有 `locate/click/drag/scroll/branch` API，并把每个动作返回的 Clicker 作为下一步
 输入；最终返回完整链条的最后一个 `std::unique_ptr<ClickerBase>`。
 
 ```cpp
@@ -300,19 +305,28 @@ std::unique_ptr<ClickerBase> last = workflow.run();
 当前 JSON v1 严格对应已经存在的线性 API：
 
 - Clicker `kind` 为 `IMAGE` 或 `TEXT`，配置分别对应 `ImageInitConfig`、`TextInitConfig`。
-- action 为 `locate`、`click`、`drag` 或 `scroll`，参数与同名 C++ 方法一致。
+- action 为 `locate`、`click`、`drag`、`scroll` 或 `branch`，参数与同名 C++ 方法一致。
 - `runConfig` 字段名与 `ImageRunConfig`/`TextRunConfig` 一致。
 - Until `type` 为 `Image/AnyImage/ImageStable/IfImage/IfAnyImage` 或对应的五种 Text 类型。
 - `AnyImage` 和 `AnyText` 使用 `targets`，其他 Until 使用 `target`。
 - `selector` 只允许出现在图片步骤中，支持 `similarity`、`random`、`position` 和 `orderedRandom`。
 - 解析器按照 `_createNext()` 规则静态推导每一步的 MatchKind；错误的 Text selector、非法枚举以及
   `locate.runUntilList` 会在执行前抛出 `std::invalid_argument`。
+- `branch` 使用一个 `condition` 和 `branches` 对象；`branches` 必须覆盖 condition 的全部候选 target，
+  每个值是一组可递归包含 branch 的步骤。为保证 None 路径与分支路径重新汇合，每个子链结束时必须回到
+  branch 之前的 MatchKind。branch 条件不允许 `reverse=true`，因为目标未命中时没有可分派的 target。
 
-v1 暂不解析分支和循环。复杂流程可以继续保留在 C++，后续控制节点建立在这个线性执行对象之上。
+v1 暂不解析通用循环；复杂循环仍可保留在 C++。
 
-`workflow-test` 的右侧面板可在 C++ 链式 API 和 JSON 工作流之间切换；28 个可视化用例
-均提供等价 JSON，用于对比两种执行入口。“运行全部 56 项”会自动逐页执行两种来源，失败项被记录
+`workflow-test` 的右侧面板可在 C++ 链式 API 和 JSON 工作流之间切换；31 个可视化用例
+均提供等价 JSON，用于对比两种执行入口。“运行全部 62 项”会自动逐页执行两种来源，失败项被记录
 后继续运行，并在最后输出汇总。
+
+命令行执行 `workflow-test.exe --run-all` 会显示同一个 Browser 窗口并自动运行全部 62 项，结束后向
+标准输出打印逐项结果与机器可读的 `SUMMARY`，全通过返回 `0`，否则返回 `1`。也可以使用
+`--cases "1,3,8-12" --source cpp|json|all` 只运行指定页面与流程来源。配置
+`WORKFLOW_REGISTER_BROWSER_TEST=ON` 后会注册 CTest 目标 `workflow.browser`；它需要可见的交互式 Windows
+桌面，因此普通构建和托管 CI 默认不注册。
 
 ## Until 条件
 
